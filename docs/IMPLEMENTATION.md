@@ -13,6 +13,14 @@ Milestone spec for `c:\DEV\agent-team`.
 
 **Commit:** `docs(p0): initial project documentation`
 
+## P0.5 — Supplemental spec (done)
+
+**Deliverables:** §Schemas/MCP/Dependencies in this file; architecture; project-integration; playbooks; personas; templates; manual S9/S10
+
+**Verify:** all paths in [§Related docs](#related-docs) exist; no `src/` yet.
+
+**Commit:** `docs(p0.5): schemas mcp playbooks personas and manual tests`
+
 ---
 
 ## S0 — Scaffold
@@ -81,9 +89,17 @@ agent-team --help   # optional stub
 
 ## S3 — CLI core
 
-**Commands:** `mail send/read`, `task create/list/claim/complete`, `logs tail`, `personas list`
+**Commands:**
 
-**Files:** `src/agent_team/cli/mail.py`, `task.py`, `logs.py`, `personas.py`
+- `agent-team mail send --session ID --to NAME --body TEXT`
+- `agent-team mail read --session ID [--since last|ISO]`
+- `agent-team task create|list|claim|complete`
+- `agent-team logs tail --session ID [--follow]`
+- `agent-team logs export --session ID --to PATH`
+- `agent-team context show [--playbook NAME]` — preview lead injection
+- `agent-team personas list`
+
+**Files:** `src/agent_team/cli/mail.py`, `task.py`, `logs.py`, `personas.py`, `context.py`
 
 **Verify:** CLI E2E with tmp session dir, 6+ tests
 
@@ -153,6 +169,8 @@ agent-team --help   # optional stub
 
 **Manual checklist:** `tests/manual/s9-claude-lead.md`
 
+**Note:** `tests/fixtures/minimal-project/` is created in S8/S9 (not required for P0 docs).
+
 1. psmux + `agent-team start` (no dry-run)
 2. Claude lead + MCP config
 3. One `spawn_teammate` → TUI approve
@@ -193,3 +211,217 @@ agent-team --help   # optional stub
 - `PsmuxBackend(mock=True)` records commands, no subprocess
 - `MockTeammateRunner` spawns `python -c "print('ready')"`
 - Session dirs under `tmp_path` pytest fixture
+
+---
+
+## P0.5 — Supplemental spec (schemas, MCP, dependencies)
+
+Added after P0 to align with full design. **S1+ implementations MUST follow these.**
+
+### §Schemas
+
+#### session.json
+
+```json
+{
+  "session_id": "agent-team-payment-api-a1b2",
+  "project_path": "c:\\DEV\\payment-api",
+  "psmux_session": "agent-team-payment-api-a1b2",
+  "playbook": "new-feature",
+  "playbook_mode": "guide",
+  "created_at": "2026-06-10T12:00:00Z",
+  "status": "active",
+  "members": [
+    {
+      "name": "lead",
+      "role": "lead",
+      "persona": null,
+      "cli": "claude",
+      "pane_id": "%0",
+      "backend": "psmux",
+      "status": "running"
+    },
+    {
+      "name": "planner-1",
+      "role": "teammate",
+      "persona": "planner",
+      "cli": "claude",
+      "pane_id": "%2",
+      "backend": "psmux",
+      "status": "running"
+    }
+  ],
+  "max_teammates": 5
+}
+```
+
+#### mailbox message (one JSONL line)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "from": "lead",
+  "to": "planner-1",
+  "body": "Please break down refund API tasks.",
+  "ts": "2026-06-10T12:01:00Z"
+}
+```
+
+#### task JSON (`tasks/task-001.json`)
+
+```json
+{
+  "id": "task-001",
+  "title": "Add refund schema",
+  "description": "Pydantic models for POST /refunds",
+  "state": "pending",
+  "deps": [],
+  "assignee": null,
+  "created_at": "2026-06-10T12:02:00Z",
+  "updated_at": "2026-06-10T12:02:00Z"
+}
+```
+
+States: `pending` | `in_progress` | `completed`. Claim sets `assignee` + `in_progress`. Deps: task cannot claim until all deps `completed`.
+
+#### event line (events.jsonl)
+
+```json
+{
+  "type": "spawn_requested",
+  "ts": "2026-06-10T12:00:30Z",
+  "payload": {
+    "persona": "planner",
+    "cli": "claude",
+    "requested_by": "lead"
+  }
+}
+```
+
+Event types (minimum): `session_started`, `spawn_requested`, `spawn_approved`, `spawn_denied`, `teammate_ready`, `teammate_shutdown`, `mail_sent`, `task_created`, `task_claimed`, `task_completed`, `error`.
+
+#### approval/pending.json
+
+```json
+{
+  "request_id": "apr-001",
+  "persona": "implementer",
+  "cli": "codex",
+  "prompt_preview": "Implement tasks from board...",
+  "requested_by": "lead",
+  "requested_at": "2026-06-10T12:05:00Z",
+  "status": "pending"
+}
+```
+
+Resolution: append to `approval/resolutions.jsonl`:
+
+```json
+{
+  "request_id": "apr-001",
+  "decision": "approved",
+  "decided_at": "2026-06-10T12:05:10Z",
+  "decided_by": "user"
+}
+```
+
+#### consumer `.agent-team/config.yaml`
+
+See `templates/project/config.yaml.j2` and [project-integration.md](project-integration.md).
+
+---
+
+### §MCP Tools
+
+**MCP is exposed to Team Lead (Claude) only.** All teammates (Claude or Codex) use `agent-team` CLI helpers for mail and tasks.
+
+Server: `python -m agent_team.mcp_server`  
+Config example: `templates/claude-mcp.json.example`
+
+| Tool | Input | Output / side effects |
+|------|-------|----------------------|
+| `list_personas` | `{}` | `{personas: [{name, cli, description}]}` |
+| `spawn_teammate` | `{persona, name?, prompt}` | Creates approval pending; returns `{request_id, status:"pending"}` |
+| `shutdown_teammate` | `{name}` | Kills pane, updates session.json |
+| `send_message` | `{to, body}` | Appends mailbox + event |
+| `read_messages` | `{since?}` | `{messages: [...]}` for lead inbox |
+| `create_task` | `{title, description?, deps?}` | Writes task JSON |
+| `claim_task` | `{task_id, assignee?}` | Fails if deps incomplete |
+| `complete_task` | `{task_id}` | Sets state completed |
+| `list_teammates` | `{}` | `{members: [...]}` from session.json |
+
+**spawn_teammate flow:**
+
+1. Lead calls `spawn_teammate` → `pending.json` written, TUI notified
+2. User approves in TUI → `resolutions.jsonl`, orchestrator spawns pane
+3. MCP returns `{name, pane_id, status:"ready"}` to lead
+
+---
+
+### §Dependencies (pyproject.toml by milestone)
+
+| Milestone | Add to dependencies | Add to dev |
+|-----------|---------------------|------------|
+| S0 | `click`, `pyyaml` | `pytest`, `ruff` |
+| S1 | — | — |
+| S3 | — | `pytest-click` (optional) |
+| S6 | `mcp` or `fastmcp` | — |
+| S7 | `textual`, `watchfiles` | — |
+| S8 | `jinja2` (templates) | — |
+
+---
+
+### §Playbooks
+
+Bundled reference copies in `docs/playbooks/`.  
+`agent-team init` copies into consumer `.agent-team/playbooks/`.
+
+**mode: guide** — YAML is hints for lead prompt only. Lead autonomously chooses spawns; user approves each spawn in TUI.
+
+Samples: `new-feature.yaml`, `bugfix.yaml`, `pr-review.yaml`, `refactor.yaml`
+
+---
+
+### §Personas
+
+Bundled in `personas/*.yaml`. Merge order:
+
+1. `~/.agent-team/personas/`
+2. `personas/` (package)
+3. `./.agent-team/personas/` (project, highest priority)
+
+Enforce `allowed_personas` from consumer `config.yaml` on spawn.
+
+---
+
+### §TUI spawn approval modal
+
+Display when `approval/pending.json` exists:
+
+- Persona name + CLI (`planner` / `claude`)
+- Prompt preview (first 200 chars)
+- Current teammate count / max (e.g. 2/5)
+- Buttons: **Approve** / **Deny**
+
+On approve: write resolution, clear pending, orchestrator continues spawn.
+
+---
+
+### §Orchestrator flags
+
+| Flag | Behavior |
+|------|----------|
+| `--playbook NAME` | Load playbook YAML into lead context |
+| `--context TEXT` | Extra user context (PR #, feature name) |
+| `--dry-run` | Mock teammates, no real Claude/Codex |
+| `--no-psmux` | TUI + file session only; no pane split |
+| `--project PATH` | Consumer project root (default cwd) |
+
+---
+
+### §Related docs
+
+- [architecture.md](architecture.md)
+- [project-integration.md](project-integration.md)
+- [tests/manual/s9-claude-lead.md](../tests/manual/s9-claude-lead.md)
+- [tests/manual/s10-payment-api-e2e.md](../tests/manual/s10-payment-api-e2e.md)

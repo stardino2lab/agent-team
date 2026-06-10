@@ -1,17 +1,28 @@
 # Progress
 
-## Current: P0 complete — Next: S0
+## Current: P0.6 complete — Next: S0
 
-## Last completed: P0 @ 2026-06-10
+## Last completed: P0.6 @ 2026-06-10
 
-- PRD, RGIO, AGENTS.md, IMPLEMENTATION.md
-- `.cursor/rules/caveman.mdc` (Caveman skill `npx` install failed: SSL cert — rule file is fallback)
-- git init, commit `85f7bae`, pushed to https://github.com/stardino2lab/agent-team
+- Expert doc review fixes: planner/reviewer CLI (no teammate MCP)
+- IMPLEMENTATION lead-only MCP note
+- pr-review unique teammate names
+- docs/setup-windows.md stub
+- AGENTS.md + README doc links
+- Pushed to https://github.com/stardino2lab/agent-team
+
+## Previous: P0.5 @ 2026-06-10
+
+- §Schemas, §MCP, playbooks, personas, templates, manual S9/S10
+
+## Previous: P0 @ 2026-06-10
+
+- PRD, RGIO, AGENTS.md, IMPLEMENTATION base, initial GitHub repo
 
 ## Next action (S0)
 
 1. Add `pyproject.toml`, `src/agent_team/`, `tests/`
-2. `pip install -e .` and empty pytest pass
+2. `pip install -e .` and pytest pass
 3. Verify → user approve → `feat(s0): project scaffold`
 
 ## Blockers
@@ -23,6 +34,8 @@
 | ID | Status |
 |----|--------|
 | P0 | done |
+| P0.5 | done |
+| P0.6 | done |
 | S0 | pending |
 | S1 | pending |
 | S2 | pending |

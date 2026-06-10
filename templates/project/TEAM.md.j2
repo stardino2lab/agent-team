@@ -1,0 +1,16 @@
+# {{ project_name }} — Agent Team Context
+
+- Stack: {{ stack }}
+- Run tests: `{{ test_command }}`
+- Lint: `{{ lint_command }}`
+- Branch: {{ branch | default("main") }}
+
+## Rules
+
+- Follow existing patterns in this repository
+- Do not modify: {{ forbidden_paths | join(", ") }}
+- Planner must approve before changing: migrations/
+
+## Notes
+
+{{ notes | default("(add project-specific notes)") }}

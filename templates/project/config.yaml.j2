@@ -1,0 +1,23 @@
+project_name: {{ project_name }}
+max_teammates: 5
+playbook_mode: guide
+allowed_personas:
+  - planner
+  - implementer
+  - reviewer
+  - tester
+default_playbook: new-feature
+
+sandbox:
+  implementer: workspace-write
+  tester: workspace-write
+
+forbidden_paths:
+  - .env
+  - secrets/
+  - prod-config/
+
+lead_context_files:
+  - TEAM.md
+  - README.md
+  - .agent-team/playbooks/{playbook}.yaml

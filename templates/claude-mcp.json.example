@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agent-team": {
+      "command": "python",
+      "args": ["-m", "agent_team.mcp_server"],
+      "env": {
+        "AGENT_TEAM_SESSION_ID": "${AGENT_TEAM_SESSION_ID}",
+        "AGENT_TEAM_PROJECT_PATH": "${AGENT_TEAM_PROJECT_PATH}"
+      }
+    }
+  }
+}

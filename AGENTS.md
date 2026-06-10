@@ -65,3 +65,7 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 - [docs/PRD.md](docs/PRD.md)
 - [docs/RGIO.md](docs/RGIO.md)
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/project-integration.md](docs/project-integration.md)
+- [docs/setup-windows.md](docs/setup-windows.md)
+- [docs/playbooks/](docs/playbooks/)

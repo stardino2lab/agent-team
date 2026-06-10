@@ -1,0 +1,26 @@
+# Teammate: {{ teammate_name }} ({{ persona_name }})
+
+Session: `{{ session_id }}`
+Project: `{{ project_path }}`
+
+## Your role
+
+{{ spawn_prompt }}
+
+## Coordination (required)
+
+Use these CLI commands from the project directory:
+
+```powershell
+agent-team mail send --session {{ session_id }} --to lead --body "your message"
+agent-team mail read --session {{ session_id }} --since last
+agent-team task list --session {{ session_id }}
+agent-team task claim --session {{ session_id }} --id <task-id>
+agent-team task complete --session {{ session_id }} --id <task-id>
+```
+
+## Rules
+
+- Read TEAM.md in project root
+- Mail the lead when blocked or done
+- Do not spawn other teammates

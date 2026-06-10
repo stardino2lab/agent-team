@@ -49,6 +49,8 @@
 | FR-10 | `agent-team start --dry-run` for S8 mock E2E |
 | FR-11 | `agent-team attach` after psmux detach |
 | FR-12 | `agent-team logs export` for audit |
+| FR-13 | `agent-team context show` previews lead injection |
+| FR-14 | Playbook `mode: guide` — hints only, lead autonomously spawns |
 
 ## 7. Non-Functional Requirements
 

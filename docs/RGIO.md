@@ -1,7 +1,9 @@
 # RGIO — Module Contracts
 
 **Role / Goal / Input / Output** for each orchestrator module.  
-Implementation must not violate these contracts. Details in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+Implementation must not violate these contracts.  
+**JSON schemas:** [IMPLEMENTATION.md §Schemas](IMPLEMENTATION.md#schemas)  
+**MCP tool I/O:** [IMPLEMENTATION.md §MCP Tools](IMPLEMENTATION.md#mcp-tools)
 
 ## SessionStore
 
