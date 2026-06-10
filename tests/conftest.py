@@ -50,3 +50,18 @@ def session_dir(session_store: SessionStore) -> Path:
 @pytest.fixture
 def event_log() -> EventLog:
     return EventLog()
+
+
+@pytest.fixture
+def consumer_project(tmp_path: Path) -> Path:
+    """Minimal consumer project after init."""
+    from click.testing import CliRunner
+
+    from agent_team.__main__ import main
+
+    project = tmp_path / "payment-api"
+    project.mkdir()
+    runner = CliRunner()
+    result = runner.invoke(main, ["init", "--project", str(project)])
+    assert result.exit_code == 0, result.output
+    return project

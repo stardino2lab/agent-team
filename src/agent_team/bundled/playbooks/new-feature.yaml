@@ -1,0 +1,41 @@
+# Guide playbook — lead decides when to spawn; not a hard pipeline.
+# mode: guide (default). See docs/IMPLEMENTATION.md §Playbooks
+
+name: new-feature
+description: New feature — plan, implement, test, review
+mode: guide
+
+suggested_teammates:
+  - persona: planner
+    when: start
+    prompt: |
+      Read TEAM.md. Produce task breakdown in docs/plans/{feature}.md.
+      Create tasks via MCP. Do not write production code.
+
+  - persona: implementer
+    when: after_task_plan_ready
+    prompt: |
+      Implement tasks from task board. Claim before work.
+      Run pytest after each task. Mail lead on blockers.
+
+  - persona: tester
+    when: after_implementation
+    prompt: |
+      Run test commands from TEAM.md. Report failures to implementer via mail.
+
+  - persona: reviewer
+    when: before_done
+    prompt: |
+      Review diff for correctness, errors, style. Request changes via mail.
+
+lead_instructions: |
+  This playbook is a GUIDE, not a mandatory pipeline.
+  You decide which personas to spawn and when (within allowed_personas, max 5).
+  Spawn only with user TUI approval.
+  Shutdown teammates when their stage is done.
+  Summarize for the user before exit.
+
+done_criteria:
+  - all tasks completed
+  - pytest passes per TEAM.md
+  - reviewer approved (if reviewer was spawned)

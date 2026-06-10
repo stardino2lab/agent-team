@@ -1,0 +1,29 @@
+name: pr-review
+description: Multi-angle PR review — no code changes
+mode: guide
+
+suggested_teammates:
+  - persona: reviewer
+    when: start
+    prompt: |
+      Security lens: auth, input validation, secrets. Read-only. Mail findings to lead.
+
+  - persona: reviewer
+    when: start
+    prompt: |
+      Performance lens: N+1, hot paths, allocations. Read-only.
+
+  - persona: tester
+    when: after_review
+    prompt: |
+      Test coverage lens: missing cases, flaky tests. Read-only.
+
+lead_instructions: |
+  Reviewers must NOT modify code. Output review summary for user.
+  Use --context for PR number or branch name.
+  Spawn each reviewer with a unique name (e.g. reviewer-sec, reviewer-perf).
+  Do not spawn two teammates with the same name.
+
+done_criteria:
+  - all reviewers reported
+  - lead synthesized summary for user

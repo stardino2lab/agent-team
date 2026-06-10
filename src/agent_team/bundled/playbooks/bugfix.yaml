@@ -1,0 +1,29 @@
+name: bugfix
+description: Bug investigation — hypotheses, fix, verify
+mode: guide
+
+suggested_teammates:
+  - persona: planner
+    when: start
+    prompt: |
+      Form 2-3 competing hypotheses. Document in docs/plans/bug-{id}.md.
+      Create investigation tasks.
+
+  - persona: implementer
+    when: after_root_cause
+    prompt: |
+      Implement minimal fix for confirmed root cause. One focused change set.
+
+  - persona: tester
+    when: after_fix
+    prompt: |
+      Reproduce original bug (should fail before fix path), then verify fix.
+
+lead_instructions: |
+  Prefer parallel planner teammates only if hypotheses are independent.
+  Keep team small for hotfixes. Guide mode — you choose spawns.
+
+done_criteria:
+  - root cause documented
+  - fix verified by tests
+  - no regressions in TEAM.md test command

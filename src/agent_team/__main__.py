@@ -5,12 +5,16 @@ from __future__ import annotations
 import click
 
 from agent_team import __version__
+from agent_team.cli.init import init_cmd
 
 
 @click.group()
 @click.version_option(version=__version__, prog_name="agent-team")
 def main() -> None:
     """Windows-native multi-agent orchestrator for Claude and Codex CLI."""
+
+
+main.add_command(init_cmd)
 
 
 @main.command()
