@@ -1,8 +1,15 @@
 # Progress
 
-## Current: P0.6 complete — Next: S0
+## Current: S0 complete — Next: S1
 
-## Last completed: P0.6 @ 2026-06-10
+## Last completed: S0 @ 2026-06-10
+
+- `pyproject.toml`, `src/agent_team/`, `tests/` scaffold
+- `pip install -e ".[dev]"` + pytest 3 passed
+- CLI: `agent-team --help`, `agent-team version` → 0.1.0
+- Python 3.12.10 venv at `.venv/`
+
+## Previous: P0.6 @ 2026-06-10
 
 - Expert doc review fixes: planner/reviewer CLI (no teammate MCP)
 - IMPLEMENTATION lead-only MCP note
@@ -19,11 +26,11 @@
 
 - PRD, RGIO, AGENTS.md, IMPLEMENTATION base, initial GitHub repo
 
-## Next action (S0)
+## Next action (S1)
 
-1. Add `pyproject.toml`, `src/agent_team/`, `tests/`
-2. `pip install -e .` and pytest pass
-3. Verify → user approve → `feat(s0): project scaffold`
+1. Implement `session`, `mailbox`, `tasks`, `event_log` per RGIO schemas
+2. Unit tests (12+ pass)
+3. Verify → user approve → `feat(s1): core session mailbox task event modules`
 
 ## Blockers
 
@@ -36,7 +43,7 @@
 | P0 | done |
 | P0.5 | done |
 | P0.6 | done |
-| S0 | pending |
+| S0 | done |
 | S1 | pending |
 | S2 | pending |
 | S3 | pending |
