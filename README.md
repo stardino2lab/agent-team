@@ -12,6 +12,10 @@ Windows-native multi-agent orchestrator for Claude CLI and Codex CLI.
 
 | Doc | Purpose |
 |-----|---------|
+| [AGENTS.md](AGENTS.md) | AI agent behavior + doc router |
+| [docs/agents/workflow.md](docs/agents/workflow.md) | Milestone workflow |
+| [docs/agents/git.md](docs/agents/git.md) | Commit/push rules |
+| [docs/agents/constraints.md](docs/agents/constraints.md) | Env and scope limits |
 | [docs/PRD.md](docs/PRD.md) | Requirements |
 | [docs/RGIO.md](docs/RGIO.md) | Module contracts |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | S0–S10 + schemas + MCP |

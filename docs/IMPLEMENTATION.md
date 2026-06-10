@@ -9,7 +9,7 @@ Milestone spec for `c:\DEV\agent-team`.
 
 **Deliverables:** PRD, RGIO, AGENTS.md, IMPLEMENTATION (this file), PROGRESS, README, `.gitignore`, `.cursor/rules/caveman.mdc`
 
-**Verify:** checklist in AGENTS.md; no `src/` yet.
+**Verify:** agent guidance in [AGENTS.md](../AGENTS.md) + [docs/agents/](agents/); no `src/` yet.
 
 **Commit:** `docs(p0): initial project documentation`
 

@@ -2,9 +2,9 @@
 
 Rules for AI agents (Cursor, Claude Code, Codex) building this repository.
 
-## Communication (S0–S8 implementation)
+## Communication
 
-Use caveman skill full — terse replies, keep code/tests/schemas complete.
+Terse replies — see [.cursor/rules/caveman.mdc](.cursor/rules/caveman.mdc).
 
 ## Behavioral Guidelines
 
@@ -37,28 +37,13 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 - Multi-step work: plan with verify checkpoints per step.
 - Run `pytest tests/ -q` before reporting milestone complete.
 
-## Project-Specific Rules
+## Repo-specific guidance
 
-- **Path:** `c:\DEV\agent-team`
-- **Layout:** `src/agent_team/` package (from S0)
-- **Python:** 3.12+, type hints, ruff
-- **Tests:** pytest required for S1+; mock only for S0–S8
-- **Milestones:** one per session — follow `docs/RGIO.md` + `docs/IMPLEMENTATION.md`
-- **Windows + psmux only** — no WSL
-- **PROGRESS.md:** update at end of each milestone
-
-## Git Workflow
-
-- **No commit or push without user approval** (except when user explicitly requests for a milestone gate)
-- **One milestone = one commit:** `docs(p0):`, `feat(s1):`, etc.
-- No force push
-- Report: changed files, test results, proposed commit message
-
-## Out of Scope (until S10 done)
-
-- Phase 2 web dashboard
-- Codex as team lead
-- Built-in Claude Agent Teams (we build custom orchestrator)
+| Doc | Read when |
+|-----|-----------|
+| [docs/agents/workflow.md](docs/agents/workflow.md) | Implementing a milestone |
+| [docs/agents/git.md](docs/agents/git.md) | Before commit or push |
+| [docs/agents/constraints.md](docs/agents/constraints.md) | Env and scope limits |
 
 ## References
 
