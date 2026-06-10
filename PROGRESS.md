@@ -1,8 +1,16 @@
 # Progress
 
-## Current: S0 complete — Next: S1
+## Current: S1 complete — Next: S2
 
-## Last completed: S0 @ 2026-06-10
+## Last completed: S1 @ 2026-06-10
+
+- API sketch + 4-expert review gate (BLOCKING=0)
+- Post-review: `safe_segment` path validation, `parse_since` consolidated
+- `session.py`, `mailbox.py`, `tasks.py`, `event_log.py`, `_io.py`
+- Unit tests: 36 total passed
+- `docs/s1-api-sketch.md` retained as implementation reference
+
+## Previous: S0 @ 2026-06-10
 
 - `pyproject.toml`, `src/agent_team/`, `tests/` scaffold
 - `pip install -e ".[dev]"` + pytest 3 passed
@@ -26,11 +34,11 @@
 
 - PRD, RGIO, AGENTS.md, IMPLEMENTATION base, initial GitHub repo
 
-## Next action (S1)
+## Next action (S2)
 
-1. Implement `session`, `mailbox`, `tasks`, `event_log` per RGIO schemas
-2. Unit tests (12+ pass)
-3. Verify → user approve → `feat(s1): core session mailbox task event modules`
+1. Implement `personas.py`, `project_loader.py`, persona YAMLs, init templates
+2. Unit tests (8+ new)
+3. Verify → user approve → `feat(s2): personas and project init templates`
 
 ## Blockers
 
@@ -44,7 +52,7 @@
 | P0.5 | done |
 | P0.6 | done |
 | S0 | done |
-| S1 | pending |
+| S1 | done |
 | S2 | pending |
 | S3 | pending |
 | S4 | pending |
