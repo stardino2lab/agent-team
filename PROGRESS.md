@@ -5,8 +5,8 @@
 ## Last completed: P0 @ 2026-06-10
 
 - PRD, RGIO, AGENTS.md, IMPLEMENTATION.md
-- Caveman rule, .gitignore
-- git init, initial commit, GitHub remote
+- `.cursor/rules/caveman.mdc` (Caveman skill `npx` install failed: SSL cert — rule file is fallback)
+- git init, commit `85f7bae`, pushed to https://github.com/stardino2lab/agent-team
 
 ## Next action (S0)
 
