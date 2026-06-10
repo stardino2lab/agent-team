@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from agent_team._io import safe_segment
+
 
 class ProjectConfigError(ValueError):
     """Raised when project config is missing or invalid."""
@@ -20,12 +22,26 @@ class PlaybookNotFoundError(FileNotFoundError):
     """Raised when a playbook file is missing."""
 
 
+class PlaybookLoadError(ValueError):
+    """Raised when playbook YAML is invalid."""
+
+
 @dataclass
 class LeadContext:
     text: str
     config: dict
     playbook_name: str | None
     playbook: dict | None
+
+
+def _load_yaml_dict(text: str, label: str, error_cls: type[Exception]) -> dict:
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise error_cls(f"Invalid YAML in {label}") from exc
+    if not isinstance(data, dict):
+        raise error_cls(f"Invalid YAML structure: {label}")
+    return data
 
 
 class ProjectLoader:
@@ -38,17 +54,18 @@ class ProjectLoader:
     def _team_md_path(self) -> Path:
         return self.project_path / "TEAM.md"
 
+    def _playbooks_dir(self) -> Path:
+        return self.project_path / ".agent-team" / "playbooks"
+
     def _playbook_path(self, name: str) -> Path:
-        return self.project_path / ".agent-team" / "playbooks" / f"{name}.yaml"
+        safe_segment(name, "playbook")
+        return self._playbooks_dir() / f"{name}.yaml"
 
     def load_config(self) -> dict:
         path = self._config_path()
         if not path.exists():
             raise ProjectConfigError(f"Missing config: {path}")
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise ProjectConfigError(f"Invalid config YAML: {path}")
-        return data
+        return _load_yaml_dict(path.read_text(encoding="utf-8"), str(path), ProjectConfigError)
 
     def load_team_md(self) -> str:
         path = self._team_md_path()
@@ -59,17 +76,14 @@ class ProjectLoader:
     def load_playbook(self, name: str | None = None) -> dict:
         config = self.load_config()
         playbook_name = name or config.get("default_playbook")
-        if not playbook_name:
+        if not playbook_name or not isinstance(playbook_name, str):
             raise PlaybookNotFoundError("No playbook name provided and default_playbook unset")
 
         path = self._playbook_path(playbook_name)
         if not path.exists():
             raise PlaybookNotFoundError(f"Playbook not found: {path}")
 
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise PlaybookNotFoundError(f"Invalid playbook YAML: {path}")
-        return data
+        return _load_yaml_dict(path.read_text(encoding="utf-8"), str(path), PlaybookLoadError)
 
     def build_lead_context(
         self,

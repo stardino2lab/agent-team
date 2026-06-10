@@ -4,12 +4,9 @@
 
 ## Last completed: S2 @ 2026-06-10
 
-- API sketch + 5-expert review gate (BLOCKING fixes applied)
-- `personas.py`, `project_loader.py`, `cli/init.py`, `bundled_paths.py`
-- `src/agent_team/bundled/` (personas, templates, playbooks)
-- jinja2 dep; `config.yaml.j2` forbidden_paths from template preset
-- Unit tests: 17 new (53 total passed)
-- `docs/s2-api-sketch.md` retained
+- API sketch + 5-expert review gate; **code review gate passed**
+- Post-review: playbook safe_segment, YAML domain errors, bundled parity tests, persona isolation
+- Unit tests: 63 passed (review fixes local, pending commit)
 
 ## Previous: S1 @ 2026-06-10
 

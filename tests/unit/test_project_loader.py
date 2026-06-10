@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from agent_team._io import InvalidPathSegmentError
 from agent_team.project_loader import (
+    PlaybookLoadError,
     PlaybookNotFoundError,
     ProjectConfigError,
     ProjectLoader,
@@ -43,6 +45,7 @@ def test_build_lead_context_sections(consumer_project: Path) -> None:
     assert "Add refund API" in ctx.text
     assert ctx.playbook_name == "new-feature"
     assert ctx.playbook is not None
+    assert ctx.config["allowed_personas"]
 
 
 def test_missing_config_raises(tmp_path: Path) -> None:
@@ -66,3 +69,29 @@ def test_missing_playbook_raises(consumer_project: Path) -> None:
     loader = ProjectLoader(consumer_project)
     with pytest.raises(PlaybookNotFoundError):
         loader.load_playbook("nonexistent")
+
+
+def test_playbook_path_traversal_rejected(consumer_project: Path) -> None:
+    loader = ProjectLoader(consumer_project)
+    with pytest.raises(InvalidPathSegmentError):
+        loader.load_playbook("../config")
+
+
+def test_invalid_playbook_yaml_raises(consumer_project: Path) -> None:
+    playbook_path = consumer_project / ".agent-team" / "playbooks" / "new-feature.yaml"
+    playbook_path.write_text("not a dict\n", encoding="utf-8")
+
+    loader = ProjectLoader(consumer_project)
+    with pytest.raises(PlaybookLoadError):
+        loader.load_playbook("new-feature")
+
+
+def test_invalid_config_yaml_raises(tmp_path: Path) -> None:
+    project = tmp_path / "proj"
+    agent_dir = project / ".agent-team"
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "config.yaml").write_text("just a string\n", encoding="utf-8")
+
+    loader = ProjectLoader(project)
+    with pytest.raises(ProjectConfigError):
+        loader.load_config()

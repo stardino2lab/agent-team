@@ -45,11 +45,18 @@ def init_cmd(template: str, project: Path, force: bool) -> None:
     """Scaffold TEAM.md and .agent-team/ in a consumer project."""
     project = project.resolve()
     team_md = project / "TEAM.md"
+    config_path = project / ".agent-team" / "config.yaml"
     agent_team_dir = project / ".agent-team"
 
-    if team_md.exists() and not force:
-        click.echo(f"TEAM.md already exists at {team_md}. Use --force to overwrite.", err=True)
+    if not force and (team_md.exists() or config_path.exists()):
+        click.echo(
+            "Project already initialized (TEAM.md or .agent-team/config.yaml exists). "
+            "Use --force to overwrite.",
+            err=True,
+        )
         sys.exit(1)
+
+    project.mkdir(parents=True, exist_ok=True)
 
     preset = INIT_TEMPLATES[template]
     context = {

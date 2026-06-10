@@ -7,7 +7,19 @@ from pathlib import Path
 import pytest
 
 from agent_team.event_log import EventLog
+from agent_team.personas import PersonaRegistry
 from agent_team.session import Member, SessionStore
+
+
+@pytest.fixture
+def empty_global_personas(tmp_path: Path) -> Path:
+    """Isolated global personas dir (missing = skip layer)."""
+    return tmp_path / "no-global-personas"
+
+
+@pytest.fixture
+def persona_registry(empty_global_personas: Path) -> PersonaRegistry:
+    return PersonaRegistry(global_dir=empty_global_personas)
 
 
 @pytest.fixture

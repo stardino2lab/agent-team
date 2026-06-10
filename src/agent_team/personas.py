@@ -30,6 +30,16 @@ class Persona:
     coordination_cli: list[str] | None = None
 
 
+def _load_yaml_dict(text: str, label: str) -> dict:
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise PersonaLoadError(f"Invalid YAML in {label}") from exc
+    if not isinstance(data, dict):
+        raise PersonaLoadError(f"Invalid persona YAML: {label}")
+    return data
+
+
 def _persona_from_dict(data: dict) -> Persona:
     try:
         name = data["name"]
@@ -39,6 +49,8 @@ def _persona_from_dict(data: dict) -> Persona:
     except KeyError as exc:
         raise PersonaLoadError(f"Missing required persona field: {exc}") from exc
 
+    if not isinstance(name, str):
+        raise PersonaLoadError("Persona name must be a string")
     safe_segment(name, "persona")
     if cli not in ("claude", "codex"):
         raise PersonaLoadError(f"Invalid cli for persona {name!r}: {cli!r}")
@@ -60,9 +72,7 @@ def _load_path_dir(directory: Path) -> dict[str, Persona]:
         return {}
     personas: dict[str, Persona] = {}
     for yaml_file in sorted(directory.glob("*.yaml")):
-        data = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise PersonaLoadError(f"Invalid persona YAML: {yaml_file}")
+        data = _load_yaml_dict(yaml_file.read_text(encoding="utf-8"), str(yaml_file))
         persona = _persona_from_dict(data)
         personas[persona.name] = persona
     return personas
@@ -74,9 +84,7 @@ def _load_bundled_dir() -> dict[str, Persona]:
     for item in sorted(root.iterdir(), key=lambda p: p.name):
         if not item.name.endswith(".yaml"):
             continue
-        data = yaml.safe_load(item.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise PersonaLoadError(f"Invalid bundled persona YAML: {item.name}")
+        data = _load_yaml_dict(item.read_text(encoding="utf-8"), item.name)
         persona = _persona_from_dict(data)
         personas[persona.name] = persona
     return personas
@@ -124,4 +132,10 @@ class PersonaRegistry:
 
     def filter_allowed(self, allowed: list[str]) -> list[Persona]:
         personas = self.load_all()
-        return [personas[name] for name in allowed if name in personas]
+        seen: set[str] = set()
+        result: list[Persona] = []
+        for name in allowed:
+            if name in personas and name not in seen:
+                result.append(personas[name])
+                seen.add(name)
+        return result
