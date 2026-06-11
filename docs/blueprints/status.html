@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent-team 구현 현황</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --done: #3fb950;
+      --pending: #484f58;
+      --next: #d29922;
+      --link: #58a6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      margin: 0;
+      padding: 1.5rem 2rem 3rem;
+      max-width: 1100px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    .summary {
+      color: var(--muted);
+      margin-bottom: 2rem;
+      font-size: 1.05rem;
+    }
+    .summary strong { color: var(--next); }
+    h2 {
+      font-size: 1.2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+      margin-top: 2rem;
+    }
+    a { color: var(--link); }
+    .gate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .gate {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.35rem;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .gate.done { border-color: var(--done); color: var(--done); }
+    .gate.next { border-color: var(--next); color: var(--next); box-shadow: 0 0 0 1px var(--next); }
+    .gate.pending { color: var(--muted); }
+    .legend { display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      margin-right: 0.35rem;
+      vertical-align: middle;
+    }
+    .legend .l-done::before { background: var(--done); }
+    .legend .l-next::before { background: var(--next); }
+    .legend .l-pending::before { background: var(--pending); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--surface); color: var(--muted); font-weight: 600; }
+    tr.done td:first-child { color: var(--done); }
+    tr.next td:first-child { color: var(--next); }
+    .mermaid { background: var(--surface); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    pre.tree {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      color: var(--muted);
+    }
+    .pane-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 4px;
+      max-width: 480px;
+      aspect-ratio: 2/1.2;
+      margin: 1rem 0;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .pane {
+      background: var(--surface);
+      padding: 0.75rem;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      color: var(--muted);
+    }
+    .pane.tui { background: #1e2a3a; color: var(--link); }
+    .pane.lead { color: #a371f7; }
+    .doc-links { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin-top: 1rem; font-size: 0.9rem; }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      background: var(--border);
+      color: var(--muted);
+      margin-left: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>agent-team 구현 현황</h1>
+  <p class="summary">
+    <strong>S7 Textual TUI 완료</strong> — 다음 <strong>S8 오케스트레이터</strong>.
+    테스트 134 passed, 1 skipped.
+  </p>
+
+  <div class="legend">
+    <span class="l-done">완료</span>
+    <span class="l-next">다음</span>
+    <span class="l-pending">예정</span>
+  </div>
+
+  <div class="gate-grid" id="gates"></div>
+
+  <h2>마일스톤 상세</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>상태</th><th>기능 요약</th><th>청사진</th></tr>
+    </thead>
+    <tbody>
+      <tr class="done"><td>P0</td><td>완료</td><td>초기 문서 (PRD, RGIO, AGENTS)</td><td><a href="../IMPLEMENTATION.md">IMPLEMENTATION §P0</a></td></tr>
+      <tr class="done"><td>P0.5</td><td>완료</td><td>스키마·MCP·플레이북 스펙</td><td><a href="../IMPLEMENTATION.md">§P0.5</a></td></tr>
+      <tr class="done"><td>S0</td><td>완료</td><td>프로젝트 스캐폴드</td><td><a href="../IMPLEMENTATION.md">§S0</a></td></tr>
+      <tr class="done"><td>S1</td><td>완료</td><td>세션·메일박스·태스크·이벤트 로그</td><td><a href="../s1-api-sketch.md">s1 sketch</a></td></tr>
+      <tr class="done"><td>S2</td><td>완료</td><td>페르소나·agent-team init</td><td><a href="../s2-api-sketch.md">s2 sketch</a></td></tr>
+      <tr class="done"><td>S3</td><td>완료</td><td>CLI mail / task / logs</td><td><a href="../s3-api-sketch.md">s3 sketch</a></td></tr>
+      <tr class="done"><td>S4</td><td>완료</td><td>psmux 백엔드</td><td><a href="../s4-api-sketch.md">s4 sketch</a></td></tr>
+      <tr class="done"><td>S5</td><td>완료</td><td>Spawn 승인 큐</td><td><a href="../s5-api-sketch.md">s5 sketch</a></td></tr>
+      <tr class="done"><td>S6</td><td>완료</td><td>MCP 서버 (팀 리드 도구)</td><td><a href="../s6-api-sketch.md">s6 sketch</a></td></tr>
+      <tr class="done"><td>S7</td><td>완료</td><td>Textual TUI</td><td><a href="../s7-api-sketch.md">s7 sketch</a> · <a href="s7-tui.html">와이어프레임</a></td></tr>
+      <tr class="next"><td>S8</td><td>다음</td><td>오케스트레이터 dry-run</td><td>—</td></tr>
+      <tr><td>S9</td><td>예정</td><td>Claude 리드 E2E (수동)</td><td>—</td></tr>
+      <tr><td>S10</td><td>예정</td><td>payment-api E2E (수동)</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h2>아키텍처</h2>
+  <div class="mermaid">
+flowchart TB
+  subgraph user [User]
+    Dev[Developer]
+  end
+  subgraph psmux [psmux Session]
+    LeadPane["Pane0 TeamLead Claude+MCP"]
+    TUIPane["Pane1 Textual TUI"]
+    Teammates["Pane2+ Teammates"]
+  end
+  subgraph core [agent_team Core]
+    Orch[Orchestrator]
+    MCP[McpServer]
+    Mail[Mailbox]
+    Tasks[TaskBoard]
+    Events[EventLog]
+    Approve[SpawnApproval]
+    Psmux[PsmuxBackend]
+  end
+  subgraph storage [Session Dir]
+    SessionJson[session.json]
+    MailboxDir[mailbox]
+    TasksDir[tasks]
+    EventsFile[events.jsonl]
+    ApprovalDir[approval]
+  end
+  Dev --> LeadPane
+  Dev --> TUIPane
+  LeadPane --> MCP
+  MCP --> Orch
+  Orch --> Psmux
+  Orch --> Mail
+  Orch --> Tasks
+  Orch --> Events
+  Orch --> Approve
+  Psmux --> Teammates
+  TUIPane --> Mail
+  TUIPane --> Approve
+  Mail --> MailboxDir
+  Tasks --> TasksDir
+  Events --> EventsFile
+  </div>
+
+  <h2>psmux pane 배치 (정상 모드)</h2>
+  <div class="pane-layout">
+    <div class="pane lead">Team Lead<br><small>Claude CLI + MCP</small></div>
+    <div class="pane tui">Textual TUI<br><small>Mail · Task · Log · 승인</small></div>
+    <div class="pane">Teammate 1<br><small>Claude / Codex</small></div>
+    <div class="pane">Teammate 2<br><small>(선택)</small></div>
+  </div>
+
+  <h2>세션 디렉터리</h2>
+  <pre class="tree">~/.agent-team/sessions/{session-id}/
+  session.json
+  events.jsonl
+  mailbox/
+    lead.jsonl
+    planner-1.jsonl
+  tasks/
+    task-001.json
+  approval/
+    pending.json          # 활성 요청 최대 1건
+    resolutions.jsonl
+  teammates/
+    planner-1/
+      spawn-prompt.txt</pre>
+
+  <h2>문서 링크</h2>
+  <div class="doc-links">
+    <a href="../STATUS.ko.md">STATUS.ko.md</a>
+    <a href="../../PROGRESS.ko.md">PROGRESS.ko.md</a>
+    <a href="../../PROGRESS.md">PROGRESS.md <span class="badge">agent</span></a>
+    <a href="../architecture.md">architecture.md</a>
+    <a href="../IMPLEMENTATION.md">IMPLEMENTATION.md</a>
+    <a href="s7-tui.html">S7 TUI 와이어프레임</a>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: "dark" });
+    const gates = [
+      { id: "P0", s: "done" }, { id: "P0.5", s: "done" }, { id: "P0.6", s: "done" },
+      { id: "S0", s: "done" }, { id: "S1", s: "done" }, { id: "S2", s: "done" },
+      { id: "S3", s: "done" }, { id: "S4", s: "done" }, { id: "S5", s: "done" },
+      { id: "S6", s: "done" }, { id: "S7", s: "done" },
+      { id: "S8", s: "next" },
+      { id: "S9", s: "pending" }, { id: "S10", s: "pending" },
+    ];
+    const grid = document.getElementById("gates");
+    gates.forEach(g => {
+      const el = document.createElement("div");
+      el.className = "gate " + g.s;
+      el.textContent = g.id;
+      grid.appendChild(el);
+    });
+  </script>
+</body>
+</html>

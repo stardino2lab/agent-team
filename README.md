@@ -8,10 +8,13 @@ Windows-native multi-agent orchestrator for Claude CLI and Codex CLI.
 
 ## Status
 
-**P0 + P0.5 complete** — documentation and supplemental spec. Implementation starts at S0.
+**S7 complete — next S8 orchestrator** — [한글 현황](docs/STATUS.ko.md) · [진행 로그](PROGRESS.ko.md) · [시각 현황](docs/blueprints/status.html) · [agent tracker](PROGRESS.md)
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/STATUS.ko.md](docs/STATUS.ko.md) | Human-readable status (Korean) |
+| [PROGRESS.ko.md](PROGRESS.ko.md) | Progress log + archive (Korean) |
+| [docs/blueprints/status.html](docs/blueprints/status.html) | Visual milestone dashboard |
 | [AGENTS.md](AGENTS.md) | AI agent behavior + doc router |
 | [docs/agents/workflow.md](docs/agents/workflow.md) | Milestone workflow |
 | [docs/agents/git.md](docs/agents/git.md) | Commit/push rules |
@@ -21,7 +24,7 @@ Windows-native multi-agent orchestrator for Claude CLI and Codex CLI.
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | S0–S10 + schemas + MCP |
 | [docs/architecture.md](docs/architecture.md) | Diagrams |
 | [docs/project-integration.md](docs/project-integration.md) | Using on app repos |
-| [PROGRESS.md](PROGRESS.md) | Milestone tracker |
+| [PROGRESS.md](PROGRESS.md) | Agent milestone tracker (English) |
 
 ## Prerequisites
 

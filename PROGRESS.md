@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S7 implemented — Next: code review gate
+## Current: S7 on main — Next: S8 orchestrator
 
 ## Last completed: S6 @ 2026-06-10
 
@@ -21,7 +21,7 @@
 
 ## Next action
 
-1. 6-expert code review → P1 fixes → commit `feat(s7): textual tui panels`
+1. S8 plan gate → implement orchestrator + pane spawn
 
 ## Blockers
 
@@ -41,7 +41,7 @@
 | S4 | done |
 | S5 | done |
 | S6 | done |
-| S7 | impl done (review pending) |
+| S7 | done |
 | S8 | pending |
 | S9 | pending |
 | S10 | pending |

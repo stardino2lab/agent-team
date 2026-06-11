@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S7 Textual TUI 와이어프레임</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1.5rem 2rem 3rem;
+      max-width: 960px;
+      margin-inline: auto;
+    }
+    h1 { font-family: "Segoe UI", sans-serif; font-size: 1.5rem; }
+    .note {
+      font-family: "Segoe UI", sans-serif;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+      border-left: 3px solid var(--yellow);
+      padding-left: 1rem;
+    }
+    .tui-frame {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      max-width: 900px;
+    }
+    .title-bar {
+      background: #21262d;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      min-height: 420px;
+    }
+    .panel {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8rem;
+    }
+    .panel-header {
+      color: var(--accent);
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px dashed var(--border);
+    }
+    .panel-body { flex: 1; color: var(--muted); overflow: hidden; }
+    .row { padding: 0.15rem 0; }
+    .row.hl { color: var(--text); background: #1f2937; }
+    .status-pending { color: var(--yellow); }
+    .status-done { color: var(--green); }
+    .member { display: flex; justify-content: space-between; padding: 0.2rem 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.35rem; }
+    .dot.on { background: var(--green); }
+    .dot.off { background: var(--muted); }
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 0.35rem 0.75rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+      display: flex;
+      gap: 1.5rem;
+    }
+    .modal-overlay {
+      position: relative;
+      margin-top: 2rem;
+      max-width: 900px;
+    }
+    .modal {
+      border: 2px solid var(--yellow);
+      border-radius: 8px;
+      background: #1c2128;
+      padding: 1rem 1.25rem;
+      max-width: 480px;
+      margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .modal h2 {
+      font-family: "Segoe UI", sans-serif;
+      font-size: 1rem;
+      color: var(--yellow);
+      margin: 0 0 0.75rem;
+    }
+    .modal .field { margin: 0.5rem 0; font-size: 0.85rem; }
+    .modal .label { color: var(--muted); }
+    .modal .preview {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      margin: 0.75rem 0;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    .buttons { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    .btn {
+      padding: 0.4rem 1.2rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-family: "Segoe UI", sans-serif;
+      border: 1px solid var(--border);
+      cursor: default;
+    }
+    .btn-approve { background: #238636; border-color: var(--green); color: #fff; }
+    .btn-deny { background: #21262d; color: var(--red); border-color: var(--red); }
+    .impl-order {
+      font-family: "Segoe UI", sans-serif;
+      margin-top: 2rem;
+      font-size: 0.9rem;
+    }
+    .impl-order ol { color: var(--muted); }
+    .impl-order li.done { color: var(--green); text-decoration: line-through; }
+    a { color: var(--accent); font-family: "Segoe UI", sans-serif; }
+  </style>
+</head>
+<body>
+  <h1>S7 Textual TUI 와이어프레임</h1>
+  <p class="note">
+    구현 전 참고용 청사진. S5 <code>spawn_approval.py</code>와 S1 데이터 레이어를 읽기 전용으로 표시.
+    구현 순서: Mail + Log → Tasks + Team → 승인 모달.
+  </p>
+
+  <div class="tui-frame">
+    <div class="title-bar">agent-team TUI — session: sess-20260610-abc · 2/5 teammates</div>
+    <div class="main">
+      <div class="panel">
+        <div class="panel-header">📬 Mail</div>
+        <div class="panel-body">
+          <div class="row hl">[12:05] lead → implementer-1: Review task-002</div>
+          <div class="row">[12:03] planner-1 → lead: Plan ready</div>
+          <div class="row">[11:58] lead → all: Session started</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">📋 Tasks</div>
+        <div class="panel-body">
+          <div class="row"><span class="status-done">●</span> task-001 Plan feature <small>(planner-1)</small></div>
+          <div class="row hl"><span class="status-pending">○</span> task-002 Implement API <small>(unassigned)</small></div>
+          <div class="row"><span class="status-pending">○</span> task-003 Write tests</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">👥 Team</div>
+        <div class="panel-body">
+          <div class="member"><span><span class="dot on"></span>lead (claude)</span><span>Pane %0</span></div>
+          <div class="member"><span><span class="dot on"></span>planner-1 (claude)</span><span>Pane %2</span></div>
+          <div class="member"><span><span class="dot off"></span>— empty slot —</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">📜 Event Log</div>
+        <div class="panel-body">
+          <div class="row">spawn_requested apr-001 implementer</div>
+          <div class="row">task_claimed task-001 planner-1</div>
+          <div class="row">message_sent lead → planner-1</div>
+          <div class="row">session_started</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>[Tab] 패널 전환</span>
+      <span>[F5] 새로고침</span>
+      <span>[?] 도움말</span>
+    </div>
+  </div>
+
+  <div class="modal-overlay">
+    <div class="modal">
+      <h2>⚠ Spawn 승인 요청</h2>
+      <div class="field"><span class="label">페르소나:</span> implementer (codex)</div>
+      <div class="field"><span class="label">팀원 이름:</span> implementer-1</div>
+      <div class="field"><span class="label">요청자:</span> lead</div>
+      <div class="field"><span class="label">팀원 수:</span> 2 / 5</div>
+      <div class="preview">Implement payment endpoint per task board. Follow RGIO contracts and add unit tests...</div>
+      <div class="buttons">
+        <span class="btn btn-approve">Approve (Y)</span>
+        <span class="btn btn-deny">Deny (N)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="impl-order">
+    <h2 style="font-size:1rem;color:var(--text)">S7 구현 순서</h2>
+    <ol>
+      <li class="done">S5 SpawnApproval API (파일 기반)</li>
+      <li>Mail 패널 + Log 패널 (읽기 전용 폴링)</li>
+      <li>Tasks 패널 + Team 패널</li>
+      <li>승인 모달 → approve/deny 호출</li>
+    </ol>
+    <p><a href="status.html">← 구현 현황으로</a> · <a href="../IMPLEMENTATION.md">IMPLEMENTATION §S7</a></p>
+  </div>
+</body>
+</html>
