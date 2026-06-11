@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -39,6 +40,13 @@ class Session:
     status: str
     members: list[Member]
     max_teammates: int
+
+
+def default_base_dir() -> Path:
+    home = os.environ.get("AGENT_TEAM_HOME")
+    if home:
+        return Path(home)
+    return Path.home() / ".agent-team"
 
 
 def _member_to_dict(member: Member) -> dict:
@@ -95,7 +103,7 @@ def _session_from_dict(data: dict) -> Session:
 
 class SessionStore:
     def __init__(self, base_dir: Path | None = None) -> None:
-        self.base_dir = base_dir or Path.home() / ".agent-team"
+        self.base_dir = base_dir or default_base_dir()
 
     def session_dir(self, session_id: str) -> Path:
         safe_segment(session_id, "session_id")

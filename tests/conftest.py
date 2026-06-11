@@ -65,6 +65,11 @@ def event_log() -> EventLog:
 
 
 @pytest.fixture
+def cli_env(sessions_base: Path) -> dict[str, str]:
+    return {"AGENT_TEAM_HOME": str(sessions_base)}
+
+
+@pytest.fixture
 def consumer_project(tmp_path: Path) -> Path:
     """Minimal consumer project after init."""
     from click.testing import CliRunner

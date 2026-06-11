@@ -5,7 +5,12 @@ from __future__ import annotations
 import click
 
 from agent_team import __version__
+from agent_team.cli.context import context_group
 from agent_team.cli.init import init_cmd
+from agent_team.cli.logs import logs_group
+from agent_team.cli.mail import mail_group
+from agent_team.cli.personas_cmd import personas_group
+from agent_team.cli.task import task_group
 
 
 @click.group()
@@ -15,6 +20,11 @@ def main() -> None:
 
 
 main.add_command(init_cmd)
+main.add_command(mail_group)
+main.add_command(task_group)
+main.add_command(logs_group)
+main.add_command(personas_group)
+main.add_command(context_group)
 
 
 @main.command()

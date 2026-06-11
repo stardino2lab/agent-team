@@ -49,6 +49,7 @@ def send(
     body: str,
     event_log: EventLog | None = None,
 ) -> Message:
+    safe_segment(from_, "sender")
     safe_segment(to, "recipient")
     message = Message(
         id=str(uuid.uuid4()),
