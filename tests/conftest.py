@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 
 from agent_team.event_log import EventLog
+from agent_team.mcp_server import McpContext
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import Member, SessionStore
+from agent_team.spawn_approval import SpawnApproval
 
 
 @pytest.fixture
@@ -88,3 +90,52 @@ def consumer_project(tmp_path: Path) -> Path:
     result = runner.invoke(main, ["init", "--project", str(project)])
     assert result.exit_code == 0, result.output
     return project
+
+
+@pytest.fixture
+def mcp_context(
+    session_store: SessionStore,
+    consumer_project: Path,
+    psmux_backend: PsmuxBackend,
+    event_log: EventLog,
+    empty_global_personas: Path,
+) -> McpContext:
+    session = session_store.create(
+        session_id="mcp-test",
+        project_path=str(consumer_project),
+        psmux_session="mcp-test",
+        max_teammates=5,
+        members=[
+            Member(
+                name="lead",
+                role="lead",
+                persona=None,
+                cli="claude",
+                pane_id="%0",
+                backend="psmux",
+                status="running",
+            ),
+            Member(
+                name="helper-1",
+                role="teammate",
+                persona="planner",
+                cli="claude",
+                pane_id="%1",
+                backend="psmux",
+                status="running",
+            ),
+        ],
+    )
+    return McpContext(
+        session_id=session.session_id,
+        session_dir=session_store.session_dir(session.session_id),
+        project_path=consumer_project,
+        store=session_store,
+        registry=PersonaRegistry(
+            project_path=consumer_project,
+            global_dir=empty_global_personas,
+        ),
+        approval=SpawnApproval(),
+        psmux=psmux_backend,
+        event_log=event_log,
+    )

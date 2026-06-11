@@ -365,7 +365,7 @@ Config example: `templates/claude-mcp.json.example`
 | S0 | `click`, `pyyaml` | `pytest`, `ruff` |
 | S1 | — | — |
 | S3 | — | `pytest-click` (optional) |
-| S6 | `mcp` or `fastmcp` | — |
+| S6 | `mcp>=1.0,<2` | — |
 | S7 | `textual`, `watchfiles` | — |
 | S8 | `jinja2` (templates) | — |
 

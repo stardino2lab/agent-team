@@ -1,21 +1,21 @@
 # Progress
 
-## Current: S5 code review gate passed — Next: commit
+## Current: S6 code review gate passed — Next: commit
 
-## Last completed: S5 @ 2026-06-10
+## Last completed: S6 @ 2026-06-10
 
 - Plan + code review gates (BLOCKING=0)
-- Post-review: re-validate pending on load
-- `spawn_approval.py` + 15 tests
-- Unit tests: 100 passed, 1 skipped (uncommitted)
+- Post-review: `except Exception`, `PersonaLoadError` map, `_run_tool` test, filter test, `AGENT_TEAM_HOME` in MCP template
+- `mcp_server.py` + 21 tests
+- Unit tests: 122 passed, 1 skipped (uncommitted)
 
-## Previous: S4 @ 2026-06-10
+## Previous: S5 @ 2026-06-10
 
-- `psmux_backend.py`; on main
+- on main
 
 ## Next action
 
-1. User approve → `feat(s5): spawn approval queue`
+1. User approve → `feat(s6): mcp server for team lead`
 
 ## Blockers
 
@@ -33,8 +33,8 @@
 | S2 | done |
 | S3 | done |
 | S4 | done |
-| S5 | done (uncommitted) |
-| S6 | pending |
+| S5 | done |
+| S6 | done (uncommitted) |
 | S7 | pending |
 | S8 | pending |
 | S9 | pending |
