@@ -32,6 +32,9 @@ agent_team = ["bundled/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "integration: tests requiring psmux in PATH",
+]
 
 [tool.ruff]
 line-length = 100

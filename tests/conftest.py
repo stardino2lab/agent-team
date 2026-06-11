@@ -8,6 +8,7 @@ import pytest
 
 from agent_team.event_log import EventLog
 from agent_team.personas import PersonaRegistry
+from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import Member, SessionStore
 
 
@@ -62,6 +63,11 @@ def session_dir(session_store: SessionStore) -> Path:
 @pytest.fixture
 def event_log() -> EventLog:
     return EventLog()
+
+
+@pytest.fixture
+def psmux_backend() -> PsmuxBackend:
+    return PsmuxBackend(mock=True)
 
 
 @pytest.fixture
