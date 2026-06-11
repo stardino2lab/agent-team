@@ -10,8 +10,9 @@ from agent_team.event_log import EventLog
 from agent_team.mcp_server import McpContext
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
-from agent_team.session import Member, SessionStore
+from agent_team.session import Member, Session, SessionStore
 from agent_team.spawn_approval import SpawnApproval
+from agent_team.tui.context import resolve_tui_context
 
 
 @pytest.fixture
@@ -137,5 +138,50 @@ def mcp_context(
         ),
         approval=SpawnApproval(),
         psmux=psmux_backend,
+        event_log=event_log,
+    )
+
+
+@pytest.fixture
+def tui_session(session_store: SessionStore) -> Session:
+    return session_store.create(
+        session_id="tui-test",
+        project_path="c:\\DEV\\test",
+        psmux_session="tui-test",
+        max_teammates=5,
+        members=[
+            Member(
+                name="lead",
+                role="lead",
+                persona=None,
+                cli="claude",
+                pane_id="%0",
+                backend="psmux",
+                status="running",
+            ),
+            Member(
+                name="helper-1",
+                role="teammate",
+                persona="planner",
+                cli="claude",
+                pane_id="%1",
+                backend="psmux",
+                status="running",
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def tui_session_dir(tui_session: Session, session_store: SessionStore) -> Path:
+    return session_store.session_dir(tui_session.session_id)
+
+
+@pytest.fixture
+def tui_context(tui_session: Session, session_store: SessionStore, event_log: EventLog):
+    return resolve_tui_context(
+        session_id=tui_session.session_id,
+        store=session_store,
+        approval=SpawnApproval(),
         event_log=event_log,
     )

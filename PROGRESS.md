@@ -1,21 +1,27 @@
 # Progress
 
-## Current: S6 code review gate passed — Next: commit
+## Current: S7 implemented — Next: code review gate
 
 ## Last completed: S6 @ 2026-06-10
 
-- Plan + code review gates (BLOCKING=0)
-- Post-review: `except Exception`, `PersonaLoadError` map, `_run_tool` test, filter test, `AGENT_TEAM_HOME` in MCP template
-- `mcp_server.py` + 21 tests
-- Unit tests: 122 passed, 1 skipped (uncommitted)
+- `mcp_server.py` — 9 MCP tools; on main
 
-## Previous: S5 @ 2026-06-10
+## S7 plan review @ 2026-06-10
 
-- on main
+- `docs/s7-api-sketch.md` — Textual 2×2, watchfiles, spawn modal
+- 6-expert plan review: BLOCKING=0
+- Post-review: dual entry (`--session` + `AGENT_TEAM_SESSION_ID`), `handle_approve/deny`, 11 tests, `__main__.py` contract
+
+## S7 implementation @ 2026-06-10
+
+- `tui/` — Textual 2×2, watchfiles, spawn modal, dual entry
+- `cli/tui_cmd.py` — `agent-team tui`
+- 11 TUI tests; **134 passed**, 1 skipped
+- Fix: `log_panel` (avoid Textual `App.log` clash)
 
 ## Next action
 
-1. User approve → `feat(s6): mcp server for team lead`
+1. 6-expert code review → P1 fixes → commit `feat(s7): textual tui panels`
 
 ## Blockers
 
@@ -34,8 +40,8 @@
 | S3 | done |
 | S4 | done |
 | S5 | done |
-| S6 | done (uncommitted) |
-| S7 | pending |
+| S6 | done |
+| S7 | impl done (review pending) |
 | S8 | pending |
 | S9 | pending |
 | S10 | pending |

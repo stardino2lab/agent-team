@@ -11,6 +11,7 @@ from agent_team.cli.logs import logs_group
 from agent_team.cli.mail import mail_group
 from agent_team.cli.personas_cmd import personas_group
 from agent_team.cli.task import task_group
+from agent_team.cli.tui_cmd import tui_cmd
 
 
 @click.group()
@@ -25,6 +26,7 @@ main.add_command(task_group)
 main.add_command(logs_group)
 main.add_command(personas_group)
 main.add_command(context_group)
+main.add_command(tui_cmd)
 
 
 @main.command()
