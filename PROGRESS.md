@@ -1,20 +1,21 @@
 # Progress
 
-## Current: S4 code review gate passed — Next: commit
+## Current: S5 code review gate passed — Next: commit
 
-## Last completed: S4 @ 2026-06-10
+## Last completed: S5 @ 2026-06-10
 
-- Plan gate + code review gate (BLOCKING=0)
-- Post-review: send_keys `-l`, pane_id parse validation, defensive recorded_calls copy, tests
-- `psmux_backend.py` + 12 unit tests + 1 integration (skip without psmux)
+- Plan + code review gates (BLOCKING=0)
+- Post-review: re-validate pending on load
+- `spawn_approval.py` + 15 tests
+- Unit tests: 100 passed, 1 skipped (uncommitted)
 
-## Previous: S3 @ 2026-06-10
+## Previous: S4 @ 2026-06-10
 
-- CLI core; 73 tests; on main
+- `psmux_backend.py`; on main
 
 ## Next action
 
-1. User approve → `feat(s4): psmux backend wrapper`
+1. User approve → `feat(s5): spawn approval queue`
 
 ## Blockers
 
@@ -31,8 +32,8 @@
 | S1 | done |
 | S2 | done |
 | S3 | done |
-| S4 | done (uncommitted) |
-| S5 | pending |
+| S4 | done |
+| S5 | done (uncommitted) |
 | S6 | pending |
 | S7 | pending |
 | S8 | pending |
