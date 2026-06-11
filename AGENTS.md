@@ -42,6 +42,7 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 | Doc | Read when |
 |-----|-----------|
 | [docs/agents/workflow.md](docs/agents/workflow.md) | Implementing a milestone |
+| [.cursor/skills/review-expert/SKILL.md](.cursor/skills/review-expert/SKILL.md) | Plan or code expert review gate |
 | [docs/agents/git.md](docs/agents/git.md) | Before commit or push |
 | [docs/agents/constraints.md](docs/agents/constraints.md) | Env and scope limits |
 
