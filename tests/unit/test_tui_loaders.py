@@ -113,6 +113,28 @@ def test_load_mail_rows_skips_malformed_lines(tui_session_dir: Path) -> None:
     assert rows[0].body == "later"
 
 
+def test_format_event_summary_s8_event_types() -> None:
+    started = Event(
+        type="session_started",
+        ts="2026-06-12T00:00:00Z",
+        payload={"session_id": "demo", "members": ["lead", "tui"]},
+    )
+    ready = Event(
+        type="teammate_ready",
+        ts="2026-06-12T00:00:01Z",
+        payload={"name": "helper-1", "persona": "planner", "pane_id": "%2"},
+    )
+    err = Event(
+        type="error",
+        ts="2026-06-12T00:00:02Z",
+        payload={"kind": "max_teammates_exceeded"},
+    )
+
+    assert format_event_summary(started) == "session_started demo"
+    assert format_event_summary(ready) == "teammate_ready helper-1 (planner)"
+    assert format_event_summary(err) == "error max_teammates_exceeded"
+
+
 def test_format_event_summary_tolerates_missing_payload_keys() -> None:
     # task_claimed without assignee: should not raise
     broken = Event(

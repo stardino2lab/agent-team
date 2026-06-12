@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S7 on main — Next: S8 orchestrator
+## Current: S8 on main — Next: S9 real teammates
 
 ## Last completed: S6 @ 2026-06-10
 
@@ -40,9 +40,24 @@
 - 보류 (S8 완료 후 별도 PR, 6건): session.py `load` wrap / `default_base_dir` 빈 문자열 / `project_loader.build_lead_context` 사용자 키 노출 / `_io._load_yaml_dict` 통합 (personas+project_loader) / IMPLEMENTATION.md doc drift × 2 (pending.json 필드, jinja2 마일스톤)
 - S8 작업자 정보 제공 (3건): missing events `session_started`/`teammate_ready`/`error` emit, `spawn_teammate` ready 콜백 메커니즘, `max_teammates` cap 재검증 in spawn dispatch
 
+## S8 plan review @ 2026-06-12
+
+- `docs/s8-api-sketch.md` 신규 — 5인 전문가 plan 리뷰: D1~D15 결정 lock-in
+- 핵심 결정: watchfiles 트리거(polling 폐기), `TeammateRunner(mock)` 패턴, `--dry-run`/`--no-psmux` orthogonal, `teammate_ready`/`session_started` 이벤트, 8 test slot
+
+## S8 implementation @ 2026-06-13
+
+- `teammate_runner.py` 신규 — `PersonaRegistry.spawn_prompt_template` 렌더 + `PsmuxBackend.split_pane/send_keys`. `mock=True`는 dry-run 안전 명령 + `send_keys` 생략
+- `orchestrator.py` 신규 — `run_once()` 멱등, `reconcile_handled()` 재시작 안전, `start()`/`attach()` lifecycle, `max_teammates` 캡 재검증(`error` event)
+- `_watcher.py` 신규 — s7 `SessionWatcher`를 일반 `FileWatcher`로 추출(`recursive`·`label` 파라미터). `tui/watcher.py`는 thin wrapper로 유지(s7 회귀 0)
+- `cli/start.py`, `cli/attach.py` 신규 — `--dry-run`/`--no-psmux`/`--no-block`(테스트 시임). `__main__.py` 등록
+- `tui/loaders.format_event_summary` — `session_started`, `teammate_ready`, `error` case 추가
+- 신규 14 테스트(4 runner + 8 orchestrator + 3 CLI + 새 loaders case + watcher 통합)
+- **163 passed**(+14), 1 skipped, ruff clean
+
 ## Next action
 
-1. S8 plan gate → implement orchestrator + pane spawn
+1. S9 plan gate → real teammate processes (`TeammateRunner(mock=False)` end-to-end + handshake)
 
 ## Blockers
 
@@ -63,6 +78,6 @@
 | S5 | done |
 | S6 | done |
 | S7 | done |
-| S8 | pending |
+| S8 | done |
 | S9 | pending |
 | S10 | pending |

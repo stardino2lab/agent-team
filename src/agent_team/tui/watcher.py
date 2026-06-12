@@ -1,19 +1,19 @@
-"""Session directory file watcher."""
+"""Session directory file watcher.
+
+Thin wrapper over agent_team._watcher.FileWatcher with the s7-specific
+behavior baked in (recursive watch on session_dir, "SessionWatcher" label
+for stderr diagnostics).
+"""
 
 from __future__ import annotations
 
-import sys
-import threading
-import time
 from collections.abc import Callable
 from pathlib import Path
 
-import watchfiles
+from agent_team._watcher import FileWatcher
 
 
-class SessionWatcher:
-    """Background watchfiles thread with debounced callback."""
-
+class SessionWatcher(FileWatcher):
     def __init__(
         self,
         session_dir: Path,
@@ -21,41 +21,10 @@ class SessionWatcher:
         *,
         debounce_ms: int = 200,
     ) -> None:
-        self._session_dir = session_dir
-        self._callback = callback
-        self._debounce_ms = debounce_ms
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        if self._thread is not None:
-            return
-
-        def run() -> None:
-            last_call = 0.0
-            try:
-                for _changes in watchfiles.watch(
-                    self._session_dir, recursive=True, stop_event=self._stop
-                ):
-                    elapsed_ms = (time.monotonic() - last_call) * 1000
-                    if elapsed_ms < self._debounce_ms:
-                        if self._stop.wait(
-                            timeout=(self._debounce_ms - elapsed_ms) / 1000
-                        ):
-                            return
-                    last_call = time.monotonic()
-                    try:
-                        self._callback()
-                    except Exception as exc:
-                        print(
-                            f"SessionWatcher callback failed: {exc!r}",
-                            file=sys.stderr,
-                        )
-            except Exception as exc:
-                print(f"SessionWatcher loop crashed: {exc!r}", file=sys.stderr)
-
-        self._thread = threading.Thread(target=run, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
+        super().__init__(
+            session_dir,
+            callback,
+            debounce_ms=debounce_ms,
+            recursive=True,
+            label="SessionWatcher",
+        )

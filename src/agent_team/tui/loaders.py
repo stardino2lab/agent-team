@@ -120,6 +120,15 @@ def format_event_summary(event: Event) -> str:
             return f"spawn_denied {p.get('request_id', '')}"
         case "teammate_shutdown":
             return f"teammate_shutdown {p.get('name', '')}"
+        case "session_started":
+            return f"session_started {p.get('session_id', '')}"
+        case "teammate_ready":
+            return (
+                f"teammate_ready {p.get('name', '')} "
+                f"({p.get('persona', '')})"
+            ).strip()
+        case "error":
+            return f"error {p.get('kind', '')}".strip()
         case _:
             return event.type
 
