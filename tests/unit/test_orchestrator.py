@@ -296,6 +296,27 @@ def test_run_once_emits_error_on_invalid_resolution_payload(
     assert any(e.payload.get("kind") == "invalid_resolution" for e in errs)
 
 
+def test_reconcile_handled_uses_teammate_ready_events_when_name_absent(
+    orchestrator: Orchestrator,
+    event_log: EventLog,
+) -> None:
+    # request without teammate_name (the realistic MCP / Python API case)
+    _request_and_approve(
+        approval=orchestrator.ctx.approval,
+        session_dir=orchestrator.ctx.session_dir,
+        event_log=event_log,
+        teammate_name=None,
+    )
+    assert orchestrator.run_once() == 1
+
+    # New orchestrator simulating attach
+    fresh = Orchestrator(orchestrator.ctx)
+    fresh.reconcile_handled()
+    assert fresh.run_once() == 0, (
+        "attach must not re-spawn an already-handled resolution"
+    )
+
+
 def test_reconcile_handled_skips_existing_teammates(
     orchestrator: Orchestrator,
     event_log: EventLog,

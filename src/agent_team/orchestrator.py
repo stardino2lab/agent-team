@@ -125,14 +125,27 @@ class Orchestrator:
     def reconcile_handled(self) -> None:
         """At attach time, re-derive the handled set from disk state.
 
-        Denied resolutions are always handled. Approved resolutions whose
-        teammate_name already appears in session.members are also handled,
-        which protects against double-spawn after a restart.
+        A resolution is treated as handled if any of the following hold:
+        - decision is "denied"
+        - an emitted teammate_ready or error event carries its request_id
+        - its teammate_name already appears in session.members
+        The event-log channel is the strongest signal, because teammate_name
+        is often None when the request did not pre-assign one.
         """
+        ready_request_ids: set[str] = set()
+        for event in self.ctx.event_log.read(self.ctx.session_dir):
+            if event.type in ("teammate_ready", "error"):
+                req_id = event.payload.get("request_id")
+                if isinstance(req_id, str):
+                    ready_request_ids.add(req_id)
+
         session = self.ctx.store.load(self.ctx.session_id)
         teammate_names = {m.name for m in session.members if m.role == "teammate"}
+
         for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
             if res.decision == "denied":
+                self._handled_request_ids.add(res.request_id)
+            elif res.request_id in ready_request_ids:
                 self._handled_request_ids.add(res.request_id)
             elif res.teammate_name and res.teammate_name in teammate_names:
                 self._handled_request_ids.add(res.request_id)
