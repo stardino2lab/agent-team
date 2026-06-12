@@ -116,12 +116,17 @@ def create_task(
     return task
 
 
+def _task_sort_key(path: Path) -> int:
+    match = _TASK_ID_PATTERN.match(path.name)
+    return int(match.group(1)) if match else -1
+
+
 def list_tasks(session_dir: Path) -> list[Task]:
     tasks_dir = _tasks_dir(session_dir)
     if not tasks_dir.exists():
         return []
     tasks: list[Task] = []
-    for path in sorted(tasks_dir.glob("task-*.json")):
+    for path in sorted(tasks_dir.glob("task-*.json"), key=_task_sort_key):
         tasks.append(_task_from_dict(read_json(path)))
     return tasks
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from agent_team._io import InvalidPathSegmentError
-from agent_team.session import Member, SessionExistsError, SessionStore
+from agent_team.session import Member, SessionExistsError, SessionNotFoundError, SessionStore
 
 
 def test_create_session_layout_and_file(session_store: SessionStore) -> None:
@@ -75,3 +75,8 @@ def test_create_duplicate_raises(session_store: SessionStore) -> None:
 def test_invalid_session_id_rejected(session_store: SessionStore) -> None:
     with pytest.raises(InvalidPathSegmentError):
         session_store.session_dir("../escape")
+
+
+def test_load_missing_raises(session_store: SessionStore) -> None:
+    with pytest.raises(SessionNotFoundError):
+        session_store.load("never-existed")

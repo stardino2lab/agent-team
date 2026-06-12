@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -33,14 +34,14 @@ def tail_cmd(session: str, lines: int, follow: bool) -> None:
         log = EventLog()
         if not follow:
             for event in log.tail(session_dir, n=lines):
-                click.echo(f"{event.ts} {event.type} {event.payload}")
+                click.echo(f"{event.ts} {event.type} {json.dumps(event.payload, default=str)}")
             return
 
         emitted = 0
         while True:
             events = log.read(session_dir)
             for event in events[emitted:]:
-                click.echo(f"{event.ts} {event.type} {event.payload}")
+                click.echo(f"{event.ts} {event.type} {json.dumps(event.payload, default=str)}")
             emitted = len(events)
             if follow_once():
                 break

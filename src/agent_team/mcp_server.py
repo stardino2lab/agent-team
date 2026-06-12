@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -107,6 +108,8 @@ def resolve_context(
 
 
 def _map_tool_error(exc: BaseException) -> str:
+    if isinstance(exc, json.JSONDecodeError):
+        return "malformed session data"
     if isinstance(
         exc,
         (
