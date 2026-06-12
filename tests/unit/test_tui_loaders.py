@@ -93,3 +93,34 @@ def test_load_event_rows_uses_summaries(tui_session_dir: Path, event_log: EventL
     rows = load_event_rows(tui_session_dir)
     assert len(rows) == 1
     assert rows[0].summary == "mail_sent lead → helper-1"
+
+
+def test_load_mail_rows_skips_malformed_lines(tui_session_dir: Path) -> None:
+    mailbox = tui_session_dir / "mailbox"
+    mailbox.mkdir(exist_ok=True)
+    (mailbox / "a.jsonl").write_text(
+        '{"ts":"2024-01-01T10:00:00Z","from":"lead","to":"a","body":"good"}\n'
+        "not json at all\n"
+        '{"ts":"2024-01-02T10:00:00Z"}\n'  # missing from/to/body — defaults applied
+        '{"from":"x","to":"y","body":"no ts"}\n'  # missing ts — skipped
+        '{"ts":"2024-01-03T10:00:00Z","from":"lead","to":"a","body":"later"}\n',
+        encoding="utf-8",
+    )
+
+    rows = load_mail_rows(tui_session_dir)
+    # 3 valid rows: "later", "good", and the ts-only row with empty fields
+    assert len(rows) == 3
+    assert rows[0].body == "later"
+
+
+def test_format_event_summary_tolerates_missing_payload_keys() -> None:
+    # task_claimed without assignee: should not raise
+    broken = Event(
+        type="task_claimed",
+        ts="2024-01-01T00:00:00Z",
+        payload={"task_id": "task-001"},
+    )
+    assert "task_claimed task-001" in format_event_summary(broken)
+
+    unknown = Event(type="something_new", ts="2024-01-01T00:00:00Z", payload={})
+    assert format_event_summary(unknown) == "something_new"

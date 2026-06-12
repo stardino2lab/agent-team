@@ -116,10 +116,15 @@ class AgentTeamApp(App):
 
     def check_spawn_modal(self) -> None:
         pending = self.ctx.approval.get_pending(self.ctx.session_dir)
-        if pending is not None and not isinstance(self.screen, SpawnApprovalModal):
-            self.push_screen(SpawnApprovalModal(self.ctx, pending, self))
-        elif pending is None and isinstance(self.screen, SpawnApprovalModal):
+        current = self.screen if isinstance(self.screen, SpawnApprovalModal) else None
+        current_id = current.pending.request_id if current else None
+        pending_id = pending.request_id if pending else None
+        if current_id == pending_id:
+            return
+        if current is not None:
             self.pop_screen()
+        if pending is not None:
+            self.push_screen(SpawnApprovalModal(self.ctx, pending, self))
 
 
 def refresh_all_panels(app: AgentTeamApp) -> None:

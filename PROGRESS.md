@@ -19,6 +19,14 @@
 - 11 TUI tests; **134 passed**, 1 skipped
 - Fix: `log_panel` (avoid Textual `App.log` clash)
 
+## S7 hardening (5-expert review) @ 2026-06-12
+
+- watcher: `awatch` (async) → `watch` (sync) — real watcher was crashing on first event; all prior tests masked it with `MagicMock`
+- watcher: try/except on loop + callback; rate-limit debounce (no trailing-edge drop) cancelable via `_stop.wait`
+- modal: `check_spawn_modal` idempotent by `request_id`; removed double-pop in `_resolve`; explicit escape no-op binding
+- loaders: `json.JSONDecodeError` guard in `load_mail_rows`; `.get()` consistency in `format_event_summary`
+- tests: real-watchfiles integration (`test_watcher.py`), pilot 4-panel + Y/N + F5 + modal-stays-open, malformed JSONL + missing-payload cases, context error paths; **144 passed**, 1 skipped
+
 ## Next action
 
 1. S8 plan gate → implement orchestrator + pane spawn

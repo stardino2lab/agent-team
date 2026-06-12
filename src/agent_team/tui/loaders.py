@@ -55,13 +55,19 @@ def load_mail_rows(session_dir: Path, *, limit: int = 100) -> list[MailRow]:
         for line in inbox.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            data = json.loads(line)
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ts = data.get("ts")
+            if not isinstance(ts, str):
+                continue
             rows.append(
                 MailRow(
-                    ts=data["ts"],
-                    from_=data["from"],
-                    to=data["to"],
-                    body=data["body"],
+                    ts=ts,
+                    from_=str(data.get("from", "")),
+                    to=str(data.get("to", "")),
+                    body=str(data.get("body", "")),
                 )
             )
 
@@ -96,24 +102,24 @@ def load_member_rows(session: Session) -> list[MemberRow]:
 
 
 def format_event_summary(event: Event) -> str:
-    payload = event.payload
+    p = event.payload
     match event.type:
         case "spawn_requested":
-            return f"spawn_requested {payload.get('request_id', '')} {payload['persona']}".strip()
+            return f"spawn_requested {p.get('request_id', '')} {p.get('persona', '')}".strip()
         case "mail_sent":
-            return f"mail_sent {payload['from']} → {payload['to']}"
+            return f"mail_sent {p.get('from', '')} → {p.get('to', '')}"
         case "task_claimed":
-            return f"task_claimed {payload['task_id']} {payload['assignee']}"
+            return f"task_claimed {p.get('task_id', '')} {p.get('assignee', '')}"
         case "task_created":
-            return f"task_created {payload['task_id']} {payload['title']}"
+            return f"task_created {p.get('task_id', '')} {p.get('title', '')}"
         case "task_completed":
-            return f"task_completed {payload['task_id']}"
+            return f"task_completed {p.get('task_id', '')}"
         case "spawn_approved":
-            return f"spawn_approved {payload['request_id']} {payload['persona']}"
+            return f"spawn_approved {p.get('request_id', '')} {p.get('persona', '')}"
         case "spawn_denied":
-            return f"spawn_denied {payload['request_id']}"
+            return f"spawn_denied {p.get('request_id', '')}"
         case "teammate_shutdown":
-            return f"teammate_shutdown {payload['name']}"
+            return f"teammate_shutdown {p.get('name', '')}"
         case _:
             return event.type
 

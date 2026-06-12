@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
@@ -40,6 +41,7 @@ class SpawnApprovalModal(ModalScreen[None]):
     BINDINGS = [
         ("y", "approve", "Approve"),
         ("n", "deny", "Deny"),
+        Binding("escape", "noop", "", show=False),
     ]
 
     def __init__(self, ctx: TuiContext, pending: SpawnRequest, app: AgentTeamApp) -> None:
@@ -70,6 +72,9 @@ class SpawnApprovalModal(ModalScreen[None]):
     def action_deny(self) -> None:
         self._resolve(approve=False)
 
+    def action_noop(self) -> None:
+        pass
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "approve":
             self._resolve(approve=True)
@@ -86,7 +91,9 @@ class SpawnApprovalModal(ModalScreen[None]):
             self.notify(str(exc), severity="error")
             return
 
+        # refresh_all_panels calls check_spawn_modal which pops this modal
+        # now that pending is cleared. Do not also call dismiss() — that would
+        # pop twice and raise ScreenStackError.
         from agent_team.tui.app import refresh_all_panels
 
         refresh_all_panels(self.team_app)
-        self.dismiss(None)
