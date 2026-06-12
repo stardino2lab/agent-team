@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import os
 import threading
 from pathlib import Path
 
 import click
 
-from agent_team.cli._helpers import echo_error
-from agent_team.event_log import EventLog
-from agent_team.orchestrator import Orchestrator, OrchestratorContext
-from agent_team.personas import PersonaRegistry
+from agent_team.cli._helpers import echo_error, make_orchestrator
 from agent_team.project_loader import (
     PlaybookNotFoundError,
     ProjectConfigError,
@@ -19,8 +15,6 @@ from agent_team.project_loader import (
 )
 from agent_team.psmux_backend import PsmuxBackend, PsmuxNotFoundError
 from agent_team.session import SessionNotFoundError, SessionStore
-from agent_team.spawn_approval import SpawnApproval
-from agent_team.teammate_runner import TeammateRunner
 
 
 @click.command("start")
@@ -74,28 +68,24 @@ def start_cmd(
     except PsmuxNotFoundError as exc:
         echo_error(str(exc))
 
-    registry = PersonaRegistry(project_path=project)
-    runner = TeammateRunner(psmux, registry, mock=dry_run)
-    ctx = OrchestratorContext(
+    orch = make_orchestrator(
         session_id=sid,
-        session_dir=store.session_dir(sid),
-        store=store,
-        approval=SpawnApproval(),
-        runner=runner,
+        project_path=project,
         psmux=psmux,
-        event_log=EventLog(),
         no_psmux=no_psmux,
+        dry_run=dry_run,
     )
-    orch = Orchestrator(ctx)
     try:
         orch.start(project_path=project, playbook=playbook, context_text=context_text)
     except (ProjectConfigError, TeamMdNotFoundError, PlaybookNotFoundError) as exc:
         echo_error(str(exc))
 
-    click.echo(f"Session {sid} started. Do not close this shell.")
+    click.echo(
+        f"Session {sid} started. Press Ctrl-C to stop the orchestrator "
+        f"(this shell drives spawn approvals; do not close it)."
+    )
 
-    no_block_env = os.environ.get("AGENT_TEAM_NO_BLOCK") == "1"
-    if no_block or no_block_env:
+    if no_block:
         orch.stop_watching()
         return
 

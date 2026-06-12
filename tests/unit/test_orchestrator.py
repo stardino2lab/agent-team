@@ -263,6 +263,39 @@ def test_start_creates_session_and_session_started_event(
     assert any("python -m agent_team.tui" in " ".join(c.args) for c in split_calls)
 
 
+def test_run_once_skips_malformed_resolution_line(
+    orchestrator: Orchestrator,
+    event_log: EventLog,
+) -> None:
+    approval_dir = orchestrator.ctx.session_dir / "approval"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    resolutions = approval_dir / "resolutions.jsonl"
+    resolutions.write_text(
+        "not valid json\n"
+        '{"request_id":"apr-001","decision":"approved",'
+        '"decided_at":"2026-06-12T00:00:00Z","decided_by":"user",'
+        '"persona":"planner","cli":"claude","prompt":"x"}\n',
+        encoding="utf-8",
+    )
+    assert orchestrator.run_once() == 1
+
+
+def test_run_once_emits_error_on_invalid_resolution_payload(
+    orchestrator: Orchestrator,
+    event_log: EventLog,
+) -> None:
+    approval_dir = orchestrator.ctx.session_dir / "approval"
+    approval_dir.mkdir(parents=True, exist_ok=True)
+    (approval_dir / "resolutions.jsonl").write_text(
+        '{"request_id":"apr-001","decision":"approved",'
+        '"decided_at":"2026-06-12T00:00:00Z","decided_by":"user"}\n',  # persona/cli missing
+        encoding="utf-8",
+    )
+    assert orchestrator.run_once() == 0
+    errs = [e for e in event_log.read(orchestrator.ctx.session_dir) if e.type == "error"]
+    assert any(e.payload.get("kind") == "invalid_resolution" for e in errs)
+
+
 def test_reconcile_handled_skips_existing_teammates(
     orchestrator: Orchestrator,
     event_log: EventLog,

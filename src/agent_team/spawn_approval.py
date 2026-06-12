@@ -327,5 +327,9 @@ class SpawnApproval:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            resolutions.append(_resolution_from_dict(json.loads(line)))
+            try:
+                data = json.loads(line)
+                resolutions.append(_resolution_from_dict(data))
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
         return resolutions

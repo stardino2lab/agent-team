@@ -151,6 +151,19 @@ class Orchestrator:
         return spawned
 
     def _spawn_one(self, res: SpawnResolution) -> bool:
+        if res.persona is None or res.cli is None:
+            self.ctx.event_log.append(
+                self.ctx.session_dir,
+                type_="error",
+                payload={
+                    "kind": "invalid_resolution",
+                    "request_id": res.request_id,
+                    "missing": [
+                        f for f in ("persona", "cli") if getattr(res, f) is None
+                    ],
+                },
+            )
+            return False
         session = self.ctx.store.load(self.ctx.session_id)
         teammate_count = sum(1 for m in session.members if m.role == "teammate")
         if teammate_count >= session.max_teammates:
@@ -166,8 +179,8 @@ class Orchestrator:
             )
             return False
         teammate_name = res.teammate_name or self._next_teammate_name(session)
-        persona = res.persona or ""
-        cli = res.cli or "claude"
+        persona = res.persona
+        cli = res.cli
 
         if self.ctx.no_psmux:
             pane_id = _NO_PSMUX_PANE_ID

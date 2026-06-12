@@ -10,15 +10,20 @@ from pathlib import Path
 from typing import NoReturn
 
 from agent_team._io import InvalidPathSegmentError, safe_segment
-from agent_team.personas import PersonaLoadError, PersonaNotFoundError
+from agent_team.event_log import EventLog
+from agent_team.orchestrator import Orchestrator, OrchestratorContext
+from agent_team.personas import PersonaLoadError, PersonaNotFoundError, PersonaRegistry
 from agent_team.project_loader import (
     PlaybookLoadError,
     PlaybookNotFoundError,
     ProjectConfigError,
     TeamMdNotFoundError,
 )
+from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import SessionNotFoundError, SessionStore, default_base_dir
+from agent_team.spawn_approval import SpawnApproval
 from agent_team.tasks import TaskDependencyError, TaskNotFoundError, TaskStateError
+from agent_team.teammate_runner import TeammateRunner
 
 
 class CliError(Exception):
@@ -157,3 +162,28 @@ def follow_once() -> bool:
 
 def follow_sleep() -> None:
     time.sleep(follow_poll_seconds())
+
+
+def make_orchestrator(
+    *,
+    session_id: str,
+    project_path: Path,
+    psmux: PsmuxBackend,
+    no_psmux: bool,
+    dry_run: bool,
+) -> Orchestrator:
+    """Assemble the standard orchestrator wiring shared by start/attach."""
+    store = SessionStore()
+    registry = PersonaRegistry(project_path=project_path)
+    runner = TeammateRunner(psmux, registry, mock=dry_run)
+    ctx = OrchestratorContext(
+        session_id=session_id,
+        session_dir=store.session_dir(session_id),
+        store=store,
+        approval=SpawnApproval(),
+        runner=runner,
+        psmux=psmux,
+        event_log=EventLog(),
+        no_psmux=no_psmux,
+    )
+    return Orchestrator(ctx)

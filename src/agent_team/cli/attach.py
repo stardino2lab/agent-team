@@ -2,20 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import threading
 from pathlib import Path
 
 import click
 
-from agent_team.cli._helpers import echo_error
-from agent_team.event_log import EventLog
-from agent_team.orchestrator import Orchestrator, OrchestratorContext
-from agent_team.personas import PersonaRegistry
-from agent_team.psmux_backend import PsmuxBackend, PsmuxNotFoundError
+from agent_team.cli._helpers import echo_error, make_orchestrator
+from agent_team.psmux_backend import PsmuxBackend, PsmuxCommandError, PsmuxNotFoundError
 from agent_team.session import SessionNotFoundError, SessionStore
-from agent_team.spawn_approval import SpawnApproval
-from agent_team.teammate_runner import TeammateRunner
 
 
 @click.command("attach")
@@ -41,25 +35,39 @@ def attach_cmd(
     except PsmuxNotFoundError as exc:
         echo_error(str(exc))
 
-    project_path = Path(session.project_path)
-    registry = PersonaRegistry(project_path=project_path)
-    runner = TeammateRunner(psmux, registry, mock=dry_run)
-    ctx = OrchestratorContext(
-        session_id=session_id,
-        session_dir=store.session_dir(session_id),
-        store=store,
-        approval=SpawnApproval(),
-        runner=runner,
-        psmux=psmux,
-        event_log=EventLog(),
-        no_psmux=no_psmux,
-    )
-    orch = Orchestrator(ctx)
-    orch.attach()
-    click.echo(f"Attached to {session_id}. Do not close this shell.")
+    if not no_psmux:
+        try:
+            psmux.list_panes(session.psmux_session)
+        except PsmuxCommandError as exc:
+            click.echo(
+                f"psmux session '{session.psmux_session}' not reachable "
+                f"({exc}); falling back to file-only mode.",
+                err=True,
+            )
+            no_psmux = True
+            psmux = PsmuxBackend(mock=True)
 
-    no_block_env = os.environ.get("AGENT_TEAM_NO_BLOCK") == "1"
-    if no_block or no_block_env:
+    project_path = Path(session.project_path)
+    if not project_path.exists():
+        echo_error(
+            f"Project path no longer exists: {project_path}. "
+            f"Recreate it or update session.json."
+        )
+
+    orch = make_orchestrator(
+        session_id=session_id,
+        project_path=project_path,
+        psmux=psmux,
+        no_psmux=no_psmux,
+        dry_run=dry_run,
+    )
+    orch.attach()
+    click.echo(
+        f"Attached to {session_id}. Press Ctrl-C to stop the orchestrator "
+        f"(this shell drives spawn approvals; do not close it)."
+    )
+
+    if no_block:
         orch.stop_watching()
         return
 
