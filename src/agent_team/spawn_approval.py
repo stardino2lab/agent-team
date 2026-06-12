@@ -43,6 +43,14 @@ class SpawnRequest:
 
 @dataclass
 class SpawnResolution:
+    """A persisted approval queue decision.
+
+    teammate_name is OFTEN None — it is only populated when the original
+    SpawnRequest pre-assigned a name. Do not use teammate_name alone for
+    orchestrator idempotency; use the request_id together with the
+    teammate_ready / error event log (see Orchestrator.reconcile_handled).
+    """
+
     request_id: str
     decision: Literal["approved", "denied"]
     decided_at: str

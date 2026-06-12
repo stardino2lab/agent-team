@@ -190,7 +190,9 @@ def test_no_psmux_skips_pane_split(
     assert not any("split-window" in c.args for c in calls)
     session = no_psmux_orchestrator.ctx.store.load(no_psmux_orchestrator.ctx.session_id)
     teammates = [m for m in session.members if m.role == "teammate"]
-    assert teammates and teammates[0].pane_id == "%file-only"
+    # pane_id is None for no_psmux members so it doesn't masquerade as a
+    # real psmux pane id (which must match `%[0-9]+`).
+    assert teammates and teammates[0].pane_id is None
 
 
 def test_run_once_caps_at_max_teammates(
@@ -218,7 +220,68 @@ def test_run_once_caps_at_max_teammates(
     )
     assert orchestrator.run_once() == 0
     errors = [e for e in event_log.read(orchestrator.ctx.session_dir) if e.type == "error"]
-    assert any(e.payload.get("kind") == "max_teammates_exceeded" for e in errors)
+    cap_err = next(
+        e for e in errors if e.payload.get("kind") == "max_teammates_exceeded"
+    )
+    assert cap_err.payload["existing_teammates"] == ["helper-1"]
+    assert cap_err.payload["max_teammates"] == 1
+
+
+def test_start_cleans_up_session_dir_on_partial_failure(
+    consumer_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = TeammateRunner(psmux_backend, persona_registry, mock=True)
+    ctx = OrchestratorContext(
+        session_id="cleanup-me",
+        session_dir=session_store.session_dir("cleanup-me"),
+        store=session_store,
+        approval=SpawnApproval(),
+        runner=runner,
+        psmux=psmux_backend,
+        event_log=event_log,
+        no_psmux=False,
+    )
+    orch = Orchestrator(ctx)
+
+    def boom(*_a, **_kw):  # type: ignore[no-untyped-def]
+        raise RuntimeError("psmux exploded")
+
+    monkeypatch.setattr(psmux_backend, "new_session", boom)
+
+    with pytest.raises(RuntimeError):
+        orch.start(project_path=consumer_project)
+
+    assert not ctx.session_dir.exists(), (
+        "session_dir must be wiped so a subsequent `start` with the same id works"
+    )
+
+
+def test_attach_method_is_idempotent_across_restarts(
+    orchestrator: Orchestrator,
+    event_log: EventLog,
+) -> None:
+    _request_and_approve(
+        approval=orchestrator.ctx.approval,
+        session_dir=orchestrator.ctx.session_dir,
+        event_log=event_log,
+        teammate_name=None,
+    )
+    assert orchestrator.run_once() == 1
+
+    fresh = Orchestrator(orchestrator.ctx)
+    try:
+        fresh.attach()
+    finally:
+        fresh.stop_watching()
+
+    session = orchestrator.ctx.store.load(orchestrator.ctx.session_id)
+    teammates = [m for m in session.members if m.role == "teammate"]
+    assert len(teammates) == 1, "attach must not re-spawn already-handled work"
 
 
 def test_start_creates_session_and_session_started_event(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,8 +13,6 @@ from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import Member, Session, SessionStore
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
-
-_NO_PSMUX_PANE_ID = "%file-only"
 
 
 @dataclass
@@ -86,33 +85,40 @@ class Orchestrator:
             max_teammates=max_teammates,
         )
 
-        members_started: list[str] = ["lead"]
-        if not self.ctx.no_psmux:
-            lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
-            self.ctx.psmux.split_pane(
-                psmux_session,
-                command="python -m agent_team.tui",
-                cwd=project_path,
-            )
-            lead.pane_id = lead_pane
-            lead.status = "running"
-            self.ctx.store.update_members(self.ctx.session_id, [lead])
-            members_started.append("tui")
+        try:
+            members_started: list[str] = ["lead"]
+            if not self.ctx.no_psmux:
+                lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
+                self.ctx.psmux.split_pane(
+                    psmux_session,
+                    command="python -m agent_team.tui",
+                    cwd=project_path,
+                )
+                lead.pane_id = lead_pane
+                lead.status = "running"
+                self.ctx.store.update_members(self.ctx.session_id, [lead])
+                members_started.append("tui")
 
-        self.ctx.event_log.append(
-            self.ctx.session_dir,
-            type_="session_started",
-            payload={
-                "session_id": self.ctx.session_id,
-                "psmux_session": psmux_session,
-                "playbook": playbook,
-                "playbook_mode": playbook_mode,
-                "members": members_started,
-                "context": context_text,
-            },
-        )
-        self.run_once()
-        self.start_watching()
+            self.ctx.event_log.append(
+                self.ctx.session_dir,
+                type_="session_started",
+                payload={
+                    "session_id": self.ctx.session_id,
+                    "psmux_session": psmux_session,
+                    "playbook": playbook,
+                    "playbook_mode": playbook_mode,
+                    "members": members_started,
+                    "context": context_text,
+                },
+            )
+            self.run_once()
+            self.start_watching()
+        except Exception:
+            # Partial start — wipe the half-built session_dir so the next
+            # `start --session SAME` is not blocked by an "already exists"
+            # check. Safe in S8 dry-run: nothing real is running yet.
+            shutil.rmtree(self.ctx.session_dir, ignore_errors=True)
+            raise
         return session
 
     def attach(self) -> Session:
@@ -178,7 +184,8 @@ class Orchestrator:
             )
             return False
         session = self.ctx.store.load(self.ctx.session_id)
-        teammate_count = sum(1 for m in session.members if m.role == "teammate")
+        existing_teammates = [m.name for m in session.members if m.role == "teammate"]
+        teammate_count = len(existing_teammates)
         if teammate_count >= session.max_teammates:
             self.ctx.event_log.append(
                 self.ctx.session_dir,
@@ -188,6 +195,7 @@ class Orchestrator:
                     "request_id": res.request_id,
                     "max_teammates": session.max_teammates,
                     "current": teammate_count,
+                    "existing_teammates": existing_teammates,
                 },
             )
             return False
@@ -196,7 +204,7 @@ class Orchestrator:
         cli = res.cli
 
         if self.ctx.no_psmux:
-            pane_id = _NO_PSMUX_PANE_ID
+            pane_id: str | None = None
         else:
             result = self.ctx.runner.spawn(
                 psmux_session=session.psmux_session,
