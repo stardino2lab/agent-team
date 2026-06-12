@@ -91,7 +91,8 @@ def start_cmd(
 
     stop_event = threading.Event()
     try:
-        stop_event.wait()
+        while not stop_event.wait(timeout=0.5):
+            pass
     except KeyboardInterrupt:
         pass
     finally:
