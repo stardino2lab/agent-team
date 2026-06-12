@@ -7,11 +7,23 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
+
 _SAFE_SEGMENT = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
 class InvalidPathSegmentError(ValueError):
     """Raised when a path segment contains unsafe characters."""
+
+
+def load_yaml_dict(text: str, label: str, error_cls: type[Exception]) -> dict:
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise error_cls(f"Invalid YAML in {label}") from exc
+    if not isinstance(data, dict):
+        raise error_cls(f"Invalid YAML structure: {label}")
+    return data
 
 
 def safe_segment(name: str, label: str) -> str:

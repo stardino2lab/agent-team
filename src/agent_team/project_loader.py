@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from agent_team._io import safe_segment
+from agent_team._io import load_yaml_dict, safe_segment
 
 
 class ProjectConfigError(ValueError):
@@ -34,16 +34,6 @@ class LeadContext:
     playbook: dict | None
 
 
-def _load_yaml_dict(text: str, label: str, error_cls: type[Exception]) -> dict:
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise error_cls(f"Invalid YAML in {label}") from exc
-    if not isinstance(data, dict):
-        raise error_cls(f"Invalid YAML structure: {label}")
-    return data
-
-
 class ProjectLoader:
     def __init__(self, project_path: Path) -> None:
         self.project_path = project_path.resolve()
@@ -65,7 +55,7 @@ class ProjectLoader:
         path = self._config_path()
         if not path.exists():
             raise ProjectConfigError(f"Missing config: {path}")
-        return _load_yaml_dict(path.read_text(encoding="utf-8"), str(path), ProjectConfigError)
+        return load_yaml_dict(path.read_text(encoding="utf-8"), str(path), ProjectConfigError)
 
     def load_team_md(self) -> str:
         path = self._team_md_path()
@@ -83,7 +73,7 @@ class ProjectLoader:
         if not path.exists():
             raise PlaybookNotFoundError(f"Playbook not found: {path}")
 
-        return _load_yaml_dict(path.read_text(encoding="utf-8"), str(path), PlaybookLoadError)
+        return load_yaml_dict(path.read_text(encoding="utf-8"), str(path), PlaybookLoadError)
 
     def build_lead_context(
         self,
@@ -102,9 +92,7 @@ class ProjectLoader:
             "--- TEAM.md ---",
             team_md,
             "--- Project config ---",
-            f"max_teammates: {config.get('max_teammates', 5)}",
-            f"playbook_mode: {config.get('playbook_mode', 'guide')}",
-            f"allowed_personas: {config.get('allowed_personas', [])}",
+            yaml.safe_dump(config, sort_keys=False).rstrip(),
         ]
         if playbook is not None and resolved_playbook_name:
             sections.extend(

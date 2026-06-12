@@ -55,6 +55,19 @@
 - 신규 14 테스트(4 runner + 8 orchestrator + 3 CLI + 새 loaders case + watcher 통합)
 - **163 passed**(+14), 1 skipped, ruff clean
 
+## S0~S6 expert review follow-up (보류 6건 적용) @ 2026-06-13
+
+- Plan: `~/.claude/plans/expert-review-temporal-deer.md` Part 5
+- 그룹 A (3 patches, S8 호출 영향 LOW):
+  - `session.py::default_base_dir` 빈 문자열/whitespace 거절 (`if home and home.strip()`)
+  - `session.py::SessionStore.load` 손상 JSON wrap → `SessionLoadError(ValueError)` 신규
+  - `project_loader.py::build_lead_context` 사용자 정의 config 키 노출 (`yaml.safe_dump(config)` 전체 dump)
+- 그룹 B (atomic 리팩터링): `_io.load_yaml_dict(text, label, error_cls)` 공개 추출 → `personas.py` + `project_loader.py` 로컬 중복 제거. exception type(`PersonaLoadError`/`ProjectConfigError`/`PlaybookLoadError`) 보존.
+- 그룹 C (문서): `IMPLEMENTATION.md` §Schemas pending.json 예시에 `prompt`+`teammate_name` 필드 추가, §Dependencies 표에서 jinja2를 S8 → S2(실제 init 사용 시점)로 정정
+- 신규 회귀 테스트 2건: `test_load_corrupt_raises` (SessionLoadError), `test_build_lead_context_emits_custom_keys`
+- Verify: pytest **169 passed**, 1 skipped, ruff clean
+- S8 정보 제공 3건 회고: E(누락 이벤트)·G(cap 재검증) S8에서 처리 완료, F(spawn_teammate ready 콜백) teammate_ready 이벤트로 부분 처리
+
 ## Next action
 
 1. S9 plan gate → real teammate processes (`TeammateRunner(mock=False)` end-to-end + handshake)

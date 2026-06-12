@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,10 @@ class SessionNotFoundError(FileNotFoundError):
 
 class SessionExistsError(FileExistsError):
     """Raised when creating a session that already exists."""
+
+
+class SessionLoadError(ValueError):
+    """Raised when session.json exists but is corrupt or missing required fields."""
 
 
 @dataclass
@@ -44,7 +49,7 @@ class Session:
 
 def default_base_dir() -> Path:
     home = os.environ.get("AGENT_TEAM_HOME")
-    if home:
+    if home and home.strip():
         return Path(home)
     return Path.home() / ".agent-team"
 
@@ -151,7 +156,10 @@ class SessionStore:
         session_path = self.session_dir(session_id) / "session.json"
         if not session_path.exists():
             raise SessionNotFoundError(f"Session not found: {session_id}")
-        return _session_from_dict(read_json(session_path))
+        try:
+            return _session_from_dict(read_json(session_path))
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise SessionLoadError(f"Corrupt session.json: {session_id}") from exc
 
     def save(self, session: Session) -> None:
         session_path = self.session_dir(session.session_id) / "session.json"

@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 
 from agent_team._io import InvalidPathSegmentError
-from agent_team.session import Member, SessionExistsError, SessionNotFoundError, SessionStore
+from agent_team.session import (
+    Member,
+    SessionExistsError,
+    SessionLoadError,
+    SessionNotFoundError,
+    SessionStore,
+)
 
 
 def test_create_session_layout_and_file(session_store: SessionStore) -> None:
@@ -80,3 +86,11 @@ def test_invalid_session_id_rejected(session_store: SessionStore) -> None:
 def test_load_missing_raises(session_store: SessionStore) -> None:
     with pytest.raises(SessionNotFoundError):
         session_store.load("never-existed")
+
+
+def test_load_corrupt_raises(session_store: SessionStore) -> None:
+    session_store.create(session_id="corrupt", project_path="x", psmux_session="corrupt")
+    session_path = session_store.session_dir("corrupt") / "session.json"
+    session_path.write_text("{ not valid json", encoding="utf-8")
+    with pytest.raises(SessionLoadError):
+        session_store.load("corrupt")

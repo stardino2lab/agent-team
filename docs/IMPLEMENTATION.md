@@ -307,12 +307,16 @@ Event types (minimum): `session_started`, `spawn_requested`, `spawn_approved`, `
   "request_id": "apr-001",
   "persona": "implementer",
   "cli": "codex",
+  "prompt": "Implement tasks from board... (full prompt, up to whatever the lead sent)",
   "prompt_preview": "Implement tasks from board...",
+  "teammate_name": null,
   "requested_by": "lead",
   "requested_at": "2026-06-10T12:05:00Z",
   "status": "pending"
 }
 ```
+
+`prompt` (full) and `teammate_name` (optional) are stored in addition to the preview so the S8 orchestrator can replay the spawn after approval; see `docs/s5-api-sketch.md`.
 
 Resolution: append to `approval/resolutions.jsonl`:
 
@@ -364,10 +368,11 @@ Config example: `templates/claude-mcp.json.example`
 |-----------|---------------------|------------|
 | S0 | `click`, `pyyaml` | `pytest`, `ruff` |
 | S1 | — | — |
+| S2 | `jinja2` (init templates) | — |
 | S3 | — | `pytest-click` (optional) |
 | S6 | `mcp>=1.0,<2` | — |
 | S7 | `textual`, `watchfiles` | — |
-| S8 | `jinja2` (templates) | — |
+| S8 | — | — |
 
 ---
 

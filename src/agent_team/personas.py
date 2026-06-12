@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
-from agent_team._io import safe_segment
+from agent_team._io import load_yaml_dict, safe_segment
 from agent_team.bundled_paths import bundled_personas_dir
 
 
@@ -28,16 +26,6 @@ class Persona:
     model_hint: str | None = None
     tools_hint: str | None = None
     coordination_cli: list[str] | None = None
-
-
-def _load_yaml_dict(text: str, label: str) -> dict:
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise PersonaLoadError(f"Invalid YAML in {label}") from exc
-    if not isinstance(data, dict):
-        raise PersonaLoadError(f"Invalid persona YAML: {label}")
-    return data
 
 
 def _persona_from_dict(data: dict) -> Persona:
@@ -72,7 +60,11 @@ def _load_path_dir(directory: Path) -> dict[str, Persona]:
         return {}
     personas: dict[str, Persona] = {}
     for yaml_file in sorted(directory.glob("*.yaml")):
-        data = _load_yaml_dict(yaml_file.read_text(encoding="utf-8"), str(yaml_file))
+        data = load_yaml_dict(
+            yaml_file.read_text(encoding="utf-8"),
+            str(yaml_file),
+            PersonaLoadError,
+        )
         persona = _persona_from_dict(data)
         personas[persona.name] = persona
     return personas
@@ -84,7 +76,7 @@ def _load_bundled_dir() -> dict[str, Persona]:
     for item in sorted(root.iterdir(), key=lambda p: p.name):
         if not item.name.endswith(".yaml"):
             continue
-        data = _load_yaml_dict(item.read_text(encoding="utf-8"), item.name)
+        data = load_yaml_dict(item.read_text(encoding="utf-8"), item.name, PersonaLoadError)
         persona = _persona_from_dict(data)
         personas[persona.name] = persona
     return personas
