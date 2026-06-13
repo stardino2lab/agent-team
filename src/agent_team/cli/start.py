@@ -1,4 +1,4 @@
-"""agent-team start — orchestrate a new session."""
+"""agent-team start - orchestrate a new session."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from agent_team.session import SessionNotFoundError, SessionStore
 )
 @click.option("--playbook", default=None, help="Playbook name (overrides config default)")
 @click.option("--context", "context_text", default=None, help="Extra context for lead prompt")
-@click.option("--dry-run", is_flag=True, help="TeammateRunner mock — no real CLI invocation")
+@click.option("--dry-run", is_flag=True, help="TeammateRunner mock - no real CLI invocation")
 @click.option("--no-psmux", is_flag=True, help="Skip psmux pane creation (file + TUI only)")
 @click.option(
     "--no-block",

@@ -1,4 +1,4 @@
-"""agent-team init — scaffold consumer project."""
+"""agent-team init - scaffold consumer project."""
 
 from __future__ import annotations
 

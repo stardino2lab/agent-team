@@ -1,4 +1,4 @@
-"""agent-team attach — resume orchestrator on an existing session."""
+"""agent-team attach - resume orchestrator on an existing session."""
 
 from __future__ import annotations
 
