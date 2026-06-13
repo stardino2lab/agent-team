@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from agent_team.event_log import EventLog
-from agent_team.orchestrator import Orchestrator, OrchestratorContext
+from agent_team.orchestrator import (
+    Orchestrator,
+    OrchestratorContext,
+    _build_lead_launch_command,
+)
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import SessionStore
@@ -326,6 +331,127 @@ def test_start_creates_session_and_session_started_event(
     assert any(
         "agent-team tui --session start-unit" in " ".join(c.args) for c in split_calls
     )
+
+
+def _start_with_minimal(
+    project: Path,
+    *,
+    session_id: str,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+) -> tuple[Orchestrator, OrchestratorContext]:
+    runner = TeammateRunner(psmux_backend, persona_registry, mock=True)
+    ctx = OrchestratorContext(
+        session_id=session_id,
+        session_dir=session_store.session_dir(session_id),
+        store=session_store,
+        approval=SpawnApproval(),
+        runner=runner,
+        psmux=psmux_backend,
+        event_log=event_log,
+        no_psmux=False,
+    )
+    return Orchestrator(ctx), ctx
+
+
+def test_start_renders_mcp_config_into_session_dir(
+    minimal_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+) -> None:
+    orch, ctx = _start_with_minimal(
+        minimal_project,
+        session_id="s9-mcp",
+        session_store=session_store,
+        psmux_backend=psmux_backend,
+        persona_registry=persona_registry,
+        event_log=event_log,
+    )
+    try:
+        orch.start(project_path=minimal_project)
+    finally:
+        orch.stop_watching()
+
+    mcp_path = ctx.session_dir / "claude-mcp.json"
+    assert mcp_path.exists()
+    data = json.loads(mcp_path.read_text(encoding="utf-8"))
+    server = data["mcpServers"]["agent-team"]
+    assert server["command"] == "python"
+    assert server["args"] == ["-m", "agent_team.mcp_server"]
+    env = server["env"]
+    assert env["AGENT_TEAM_SESSION_ID"] == "s9-mcp"
+    assert env["AGENT_TEAM_PROJECT_PATH"] == str(minimal_project.resolve())
+
+
+def test_start_sends_keys_to_lead_pane_with_claude_command(
+    minimal_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+) -> None:
+    orch, _ = _start_with_minimal(
+        minimal_project,
+        session_id="s9-cmd",
+        session_store=session_store,
+        psmux_backend=psmux_backend,
+        persona_registry=persona_registry,
+        event_log=event_log,
+    )
+    try:
+        orch.start(project_path=minimal_project)
+    finally:
+        orch.stop_watching()
+
+    send_calls = [
+        c for c in psmux_backend.recorded_calls if "send-keys" in c.args
+    ]
+    payload = " ".join(send_calls[0].args)
+    assert "claude" in payload
+    assert "--mcp-config" in payload
+    assert "--strict-mcp-config" in payload
+
+
+def test_start_sends_lead_context_via_append_system_prompt(
+    minimal_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+) -> None:
+    orch, _ = _start_with_minimal(
+        minimal_project,
+        session_id="s9-ctx",
+        session_store=session_store,
+        psmux_backend=psmux_backend,
+        persona_registry=persona_registry,
+        event_log=event_log,
+    )
+    try:
+        orch.start(project_path=minimal_project)
+    finally:
+        orch.stop_watching()
+
+    send_calls = [
+        c for c in psmux_backend.recorded_calls if "send-keys" in c.args
+    ]
+    keys_arg = send_calls[0].args[send_calls[0].args.index("-l") + 1]
+    assert "--append-system-prompt" in keys_arg
+    # TEAM.md content makes it through build_lead_context()
+    assert "minimal-project" in keys_arg
+
+
+def test_unsupported_lead_cli_raises_not_implemented(tmp_path: Path) -> None:
+    with pytest.raises(NotImplementedError, match="S11"):
+        _build_lead_launch_command(
+            "codex",
+            mcp_config=tmp_path / "x.json",
+            lead_context="ignored",
+        )
 
 
 def test_run_once_skips_malformed_resolution_line(

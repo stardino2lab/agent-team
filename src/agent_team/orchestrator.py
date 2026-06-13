@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 from dataclasses import dataclass
@@ -11,9 +12,56 @@ from agent_team._watcher import FileWatcher
 from agent_team.event_log import EventLog
 from agent_team.project_loader import ProjectLoader
 from agent_team.psmux_backend import PsmuxBackend
-from agent_team.session import Member, Session, SessionStore
+from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
+
+
+def _write_lead_mcp_config(session_dir: Path, session_id: str, project_path: Path) -> Path:
+    """Render the lead's MCP config JSON to {session_dir}/claude-mcp.json.
+
+    Uses json.dumps (not Jinja) so Windows backslashes do not need manual
+    escaping inside the template.
+    """
+    config = {
+        "mcpServers": {
+            "agent-team": {
+                "command": "python",
+                "args": ["-m", "agent_team.mcp_server"],
+                "env": {
+                    "AGENT_TEAM_HOME": str(default_base_dir()),
+                    "AGENT_TEAM_SESSION_ID": session_id,
+                    "AGENT_TEAM_PROJECT_PATH": str(project_path.resolve()),
+                },
+            }
+        }
+    }
+    path = session_dir / "claude-mcp.json"
+    path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    return path
+
+
+def _build_lead_launch_command(
+    cli: str, *, mcp_config: Path, lead_context: str
+) -> str:
+    """Compose the lead CLI launch line that gets send_keys'd to the lead pane.
+
+    S9 supports claude only. codex / antigravity are S11+ and would add an
+    elif branch here (plus their own MCP config template). The seam is
+    intentionally narrow so future additions do not touch Orchestrator.start.
+    """
+    if cli == "claude":
+        # Escape embedded double quotes in the context so the single outer
+        # quote pair survives the trip through psmux send_keys + the terminal.
+        escaped_context = lead_context.replace('"', '\\"')
+        return (
+            f'claude --mcp-config "{mcp_config}" --strict-mcp-config '
+            f'--append-system-prompt "{escaped_context}"'
+        )
+    raise NotImplementedError(
+        f"Lead CLI {cli!r} not supported yet "
+        f"(codex/antigravity planned for S11+)"
+    )
 
 
 @dataclass
@@ -65,13 +113,14 @@ class Orchestrator:
         config = loader.load_config()
         max_teammates = int(config.get("max_teammates", 5))
         playbook_mode = str(config.get("playbook_mode", "guide"))
+        lead_cli = str(config.get("lead_cli", "claude"))
 
         psmux_session = self.ctx.session_id
         lead = Member(
             name="lead",
             role="lead",
             persona=None,
-            cli="claude",
+            cli=lead_cli,
             pane_id=None,
             backend="psmux",
             status="pending",
@@ -89,7 +138,19 @@ class Orchestrator:
         try:
             members_started: list[str] = ["lead"]
             if not self.ctx.no_psmux:
+                mcp_config_path = _write_lead_mcp_config(
+                    self.ctx.session_dir, self.ctx.session_id, project_path
+                )
+                lead_context = loader.build_lead_context(
+                    playbook_name=playbook, extra_context=context_text
+                )
+                launch_cmd = _build_lead_launch_command(
+                    lead_cli,
+                    mcp_config=mcp_config_path,
+                    lead_context=lead_context.text,
+                )
                 lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
+                self.ctx.psmux.send_keys(lead_pane, launch_cmd, enter=True)
                 # CLI entry (not `python -m agent_team.tui`) so the session id
                 # flows through argv. The module entry needs AGENT_TEAM_SESSION_ID,
                 # which psmux.split_pane has no way to inject.
@@ -222,6 +283,9 @@ class Orchestrator:
                 persona=persona,
                 prompt=res.prompt or "",
                 teammate_name=teammate_name,
+                session_id=session.session_id,
+                session_dir=self.ctx.session_dir,
+                project_path=Path(session.project_path),
             )
             pane_id = result.pane_id
 

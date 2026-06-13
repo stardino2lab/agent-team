@@ -12,7 +12,7 @@ Project: `{{ project_path }}`
 Use these CLI commands from the project directory:
 
 ```powershell
-agent-team mail send --session {{ session_id }} --to lead --body "your message"
+agent-team mail send --session {{ session_id }} --as {{ teammate_name }} --to lead --body "your message"
 agent-team mail read --session {{ session_id }} --as {{ teammate_name }} --since last
 agent-team task list --session {{ session_id }}
 agent-team task claim --session {{ session_id }} --id <task-id> --assignee {{ teammate_name }}

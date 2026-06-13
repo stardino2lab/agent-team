@@ -29,16 +29,36 @@ def mock_runner(
     return TeammateRunner(psmux_backend, persona_registry, mock=True)
 
 
+def _spawn_kwargs(
+    *,
+    session_dir: Path,
+    project_path: Path,
+    teammate_name: str = "helper-1",
+    persona: str = "planner",
+    prompt: str = "Plan the auth feature.",
+) -> dict:
+    return {
+        "psmux_session": "test",
+        "persona": persona,
+        "prompt": prompt,
+        "teammate_name": teammate_name,
+        "session_id": "demo",
+        "session_dir": session_dir,
+        "project_path": project_path,
+    }
+
+
 def test_spawn_splits_pane_and_sends_persona_prompt(
     runner: TeammateRunner,
     psmux_backend: PsmuxBackend,
+    tmp_path: Path,
 ) -> None:
-    result = runner.spawn(
-        psmux_session="test",
-        persona="planner",
-        prompt="Plan the auth feature.",
-        teammate_name="helper-1",
-    )
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    result = runner.spawn(**_spawn_kwargs(session_dir=session_dir, project_path=project))
 
     assert result.pane_id.startswith("%")
     assert result.teammate_name == "helper-1"
@@ -48,6 +68,8 @@ def test_spawn_splits_pane_and_sends_persona_prompt(
     calls = psmux_backend.recorded_calls
     split = next(c for c in calls if "split-window" in c.args)
     assert "claude" in " ".join(split.args)
+    # split is run from the teammate dir (so AGENTS.md is picked up via cwd)
+    assert split.cwd == str((session_dir / "teammates" / "helper-1").resolve())
 
     send = next(c for c in calls if "send-keys" in c.args)
     keys_arg = send.args[send.args.index("-l") + 1]
@@ -58,15 +80,45 @@ def test_spawn_splits_pane_and_sends_persona_prompt(
     assert runner.recorded_spawns[0].persona == "planner"
 
 
-def test_spawn_mock_uses_safe_command_and_skips_send_keys(
+def test_spawn_renders_agents_md_per_teammate(
+    runner: TeammateRunner,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="helper-7",
+            persona="planner",
+            prompt="Plan login flow.",
+        )
+    )
+    agents_md = session_dir / "teammates" / "helper-7" / "AGENTS.md"
+    assert agents_md.exists()
+    body = agents_md.read_text(encoding="utf-8")
+    assert "helper-7" in body
+    assert "planner" in body
+    assert "demo" in body  # session_id
+    assert "Plan login flow." in body
+
+
+def test_spawn_mock_uses_safe_command_skips_send_keys_and_no_agents_md(
     mock_runner: TeammateRunner,
     psmux_backend: PsmuxBackend,
+    tmp_path: Path,
 ) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
     result = mock_runner.spawn(
-        psmux_session="test",
-        persona="planner",
-        prompt="ignored in mock",
-        teammate_name="helper-1",
+        **_spawn_kwargs(session_dir=session_dir, project_path=project)
     )
 
     assert result.pane_id.startswith("%")
@@ -76,31 +128,21 @@ def test_spawn_mock_uses_safe_command_and_skips_send_keys(
     assert "claude" not in joined
     assert "dry-run teammate ready" in joined
     assert not any("send-keys" in c.args for c in calls)
+    assert not (session_dir / "teammates").exists(), (
+        "mock mode must not touch the filesystem"
+    )
 
 
-def test_spawn_unknown_persona_raises(runner: TeammateRunner) -> None:
-    with pytest.raises(PersonaNotFoundError):
-        runner.spawn(
-            psmux_session="test",
-            persona="ghost",
-            prompt="x",
-            teammate_name="helper-1",
-        )
-
-
-def test_spawn_passes_cwd(
-    runner: TeammateRunner,
-    psmux_backend: PsmuxBackend,
-    tmp_path: Path,
-) -> None:
+def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:
     project = tmp_path / "proj"
     project.mkdir()
-    runner.spawn(
-        psmux_session="test",
-        persona="planner",
-        prompt="x",
-        teammate_name="helper-1",
-        cwd=project,
-    )
-    split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
-    assert split.cwd == str(project.resolve())
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    with pytest.raises(PersonaNotFoundError):
+        runner.spawn(
+            **_spawn_kwargs(
+                session_dir=session_dir,
+                project_path=project,
+                persona="ghost",
+            )
+        )

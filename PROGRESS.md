@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S8 on main — Next: S9 real teammates
+## Current: S9 code-complete on main — Next: S9 manual smoke + S10
 
 ## Last completed: S6 @ 2026-06-10
 
@@ -76,9 +76,30 @@
 - 문서: `IMPLEMENTATION.md` §Schemas config.yaml 항목에 "Lead exposure scope" 명시 (allowlist 의도 + TEAM.md/--context 경로 안내)
 - Verify: pytest **172 passed**, 1 skipped, ruff clean
 
+## S9 plan review @ 2026-06-13
+
+- `docs/s9-api-sketch.md` 작성 + 5인 전문가 plan 리뷰 (D1~D11)
+- Q1·Q2·Q3 사용자 환경에서 확인 — `--mcp-config`, `--strict-mcp-config`, `--append-system-prompt` 모두 존재 (Claude 2.1.175)
+- 다중 CLI 입장 (D11) = B 경량 isolation (사용자 결정) — `_build_lead_launch_command` + `lead_cli` config field
+
+## S9 code-complete @ 2026-06-13
+
+- `agent_team.bundled_paths.render_bundled_template` 신규 — Jinja `PackageLoader` 단일 진입
+- `agent_team.orchestrator._write_lead_mcp_config` 신규 — `{session_dir}/claude-mcp.json` 렌더 (json.dumps; Windows backslash 안전)
+- `agent_team.orchestrator._build_lead_launch_command` 신규 — claude 분기 + codex/antigravity NotImplementedError (S11+)
+- `Orchestrator.start` — MCP config 쓰기 → lead pane `send_keys(claude --mcp-config ... --strict-mcp-config --append-system-prompt ...)` → split TUI pane
+- `Orchestrator.start` — `config.yaml.lead_cli` (default `claude`) 로 lead `cli` 결정
+- `TeammateRunner.spawn` — `{session_dir}/teammates/{name}/AGENTS.md` 렌더 + 그 디렉터리에서 split_pane (AGENTS.md 자동 인지)
+- 템플릿 이동: `templates/teammate/AGENTS.md.codex.j2` → `src/agent_team/bundled/templates/teammate/AGENTS.md.j2`. `templates/claude-mcp.json.example` 은 reference 로 루트 유지 (json.dumps 가 더 안전해서 템플릿 미사용)
+- `bundled/templates/project/config.yaml.j2` + 루트 동기본 — `lead_cli: claude` 기본값 추가
+- `tests/fixtures/minimal-project/` 신규 — `.agent-team/config.yaml` + `TEAM.md`
+- 신규 6 테스트 (4 unit + 1 e2e + 1 NotImplementedError + AGENTS.md 슬롯 보강)
+- **177 passed**(+5), 1 skipped, ruff clean
+
 ## Next action
 
-1. S9 plan gate → real teammate processes (`TeammateRunner(mock=False)` end-to-end + handshake)
+1. **S9 manual smoke** — `tests/manual/s9-claude-lead.md` 정정판 사용. psmux + claude 2.1.175 로 한 사이클.
+2. 결과 pass 면 S9 done → S10 (payment-api E2E) 진입.
 
 ### Carried into S9 from S8 reviews
 
@@ -106,5 +127,5 @@
 | S6 | done |
 | S7 | done |
 | S8 | done |
-| S9 | pending |
+| S9 | code-complete (manual pending) |
 | S10 | pending |

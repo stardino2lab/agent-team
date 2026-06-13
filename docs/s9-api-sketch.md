@@ -17,6 +17,7 @@ Review input for 5-expert gate. Implementation follows after BLOCKING=0.
 | psmux session ownership | `agent-team start` creates the psmux session (same as s8). The user runs the command from outside psmux and later does `psmux attach -t SID` to see the panes. The s9 manual checklist text "in pane 0" is corrected. |
 | Test slots | 4 unit (mcp render, lead send_keys, lead context, teammate AGENTS.md render) + 1 e2e (PsmuxBackend monkeypatch records the start sequence) + 1 minimal-project fixture. Manual smoke is the acceptance gate. |
 | `--no-dry-run` flag | **Does not exist.** Default mode is real; `--dry-run` is the opt-in. The s9 manual checklist is updated accordingly. |
+| Multi-CLI extension (D11) | Light isolation only. Lead launch goes through `_build_lead_launch_command(cli, ...)` which only knows `"claude"` today; `codex` / `antigravity` raise `NotImplementedError` until S11+. Lead's `cli` is read from `config.yaml`'s `lead_cli` field (default `claude`). No Protocol / ABC; future CLIs are an elif and a new MCP-config render branch. |
 
 ## Lead launch
 
@@ -109,12 +110,13 @@ No new event types in S9. `session_started`, `teammate_ready`, `error`, `orchest
 
 | # | File | Verifies |
 |---|------|----------|
-| 1 | `tests/unit/test_orchestrator.py::test_start_writes_mcp_config_to_session_dir` | `{session_dir}/claude-mcp.json` exists with absolute paths and the session id |
-| 2 | `tests/unit/test_orchestrator.py::test_start_sends_claude_launch_to_lead_pane` | `psmux.recorded_calls` contains `send-keys -t <lead_pane> -l "claude --mcp-config ... --strict-mcp-config --append-system-prompt ..."` |
-| 3 | `tests/unit/test_orchestrator.py::test_start_appended_system_prompt_includes_lead_context` | the appended prompt contains a known substring from the minimal-project TEAM.md |
-| 4 | `tests/unit/test_teammate_runner.py::test_spawn_renders_agents_md` | `{session_dir}/teammates/helper-1/AGENTS.md` exists and mentions persona, teammate name, session id |
-| 5 | `tests/unit/test_cli_start_attach.py::test_start_real_mode_renders_mcp_and_sends_claude` | CliRunner + monkeypatched PsmuxBackend → all of #1-#3 from the CLI path |
-| 6 | `tests/fixtures/minimal-project/` | new fixture: `.agent-team/config.yaml` + `TEAM.md`. Replaces the dynamic `consumer_project` for s9 tests |
+| 1 | `tests/unit/test_orchestrator.py::test_start_renders_mcp_config_into_session_dir` | `{session_dir}/claude-mcp.json` exists with absolute paths and the session id |
+| 2 | `tests/unit/test_orchestrator.py::test_start_sends_keys_to_lead_pane_with_claude_command` | `psmux.recorded_calls` contains `send-keys -t <lead_pane> -l "claude --mcp-config ... --strict-mcp-config --append-system-prompt ..."` |
+| 3 | `tests/unit/test_orchestrator.py::test_start_sends_lead_context_via_append_system_prompt` | the appended prompt contains a known substring from the minimal-project TEAM.md |
+| 4 | `tests/unit/test_teammate_runner.py::test_spawn_renders_agents_md_per_teammate` | `{session_dir}/teammates/helper-7/AGENTS.md` exists and mentions persona, teammate name, session id |
+| 5 | `tests/unit/test_cli_start_attach.py::test_start_real_mode_renders_mcp_config_and_sends_claude_launch` | CliRunner + monkeypatched PsmuxBackend → all of #1-#3 from the CLI path |
+| 6 | `tests/fixtures/minimal-project/` | new fixture: `.agent-team/config.yaml` + `TEAM.md`. Lighter than `consumer_project` for s9 unit tests |
+| 7 | `tests/unit/test_orchestrator.py::test_unsupported_lead_cli_raises_not_implemented` | passing `cli="codex"` to `_build_lead_launch_command` raises `NotImplementedError` mentioning S11 |
 
 Existing s8 tests keep passing — no regressions in dry-run paths.
 

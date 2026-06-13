@@ -1,0 +1,7 @@
+project_name: minimal-project
+max_teammates: 3
+playbook_mode: guide
+lead_cli: claude
+allowed_personas:
+  - planner
+  - implementer

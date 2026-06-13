@@ -94,6 +94,21 @@ def consumer_project(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def minimal_project(tmp_path: Path) -> Path:
+    """Pre-baked tests/fixtures/minimal-project/ copied into tmp_path.
+
+    Lighter than `consumer_project` (skips the `agent-team init` runtime cost)
+    and matches the project shape referenced by the s9 manual checklist.
+    """
+    import shutil
+
+    src = Path(__file__).parent / "fixtures" / "minimal-project"
+    dst = tmp_path / "minimal-project"
+    shutil.copytree(src, dst)
+    return dst
+
+
+@pytest.fixture
 def mcp_context(
     session_store: SessionStore,
     consumer_project: Path,
