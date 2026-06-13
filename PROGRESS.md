@@ -68,6 +68,14 @@
 - Verify: pytest **169 passed**, 1 skipped, ruff clean
 - S8 정보 제공 3건 회고: E(누락 이벤트)·G(cap 재검증) S8에서 처리 완료, F(spawn_teammate ready 콜백) teammate_ready 이벤트로 부분 처리
 
+## S0~S6 follow-up code review (3-expert) @ 2026-06-13
+
+- 3-expert code review on `77c7023`: BLOCKING=1(=P1 재평가), P1=1, P2=6 — 핵심은 `build_lead_context` 전체 dump가 secret 누출 default unsafe
+- 결정: **옵션 3 (A-3 revert)** — 3키 allowlist(`max_teammates`/`playbook_mode`/`allowed_personas`) 복원. 사용자 도메인 컨텍스트 전달은 TEAM.md / `--context "..."` 정식 경로 사용.
+- Revert: `project_loader.py::build_lead_context` 원복. 테스트도 누출 검증으로 교체(`test_build_lead_context_does_not_leak_unknown_keys`).
+- 문서: `IMPLEMENTATION.md` §Schemas config.yaml 항목에 "Lead exposure scope" 명시 (allowlist 의도 + TEAM.md/--context 경로 안내)
+- Verify: pytest **172 passed**, 1 skipped, ruff clean
+
 ## Next action
 
 1. S9 plan gate → real teammate processes (`TeammateRunner(mock=False)` end-to-end + handshake)

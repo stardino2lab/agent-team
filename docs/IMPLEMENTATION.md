@@ -333,6 +333,8 @@ Resolution: append to `approval/resolutions.jsonl`:
 
 See `templates/project/config.yaml.j2` and [project-integration.md](project-integration.md).
 
+**Lead exposure scope:** only `max_teammates`, `playbook_mode`, `allowed_personas` are emitted into the lead system prompt by `ProjectLoader.build_lead_context`. This is an allowlist by design — unknown keys (including any accidental secrets like `api_token`) stay local to agent-team and never reach the LLM. Domain-specific context (API URLs, branch names, runbook snippets, etc.) belongs in `TEAM.md`, whose contents are injected raw into the lead prompt. One-shot ad-hoc context goes through `--context "..."` on `agent-team start`.
+
 ---
 
 ### §MCP Tools

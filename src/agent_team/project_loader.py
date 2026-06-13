@@ -92,7 +92,9 @@ class ProjectLoader:
             "--- TEAM.md ---",
             team_md,
             "--- Project config ---",
-            yaml.safe_dump(config, sort_keys=False).rstrip(),
+            f"max_teammates: {config.get('max_teammates', 5)}",
+            f"playbook_mode: {config.get('playbook_mode', 'guide')}",
+            f"allowed_personas: {config.get('allowed_personas', [])}",
         ]
         if playbook is not None and resolved_playbook_name:
             sections.extend(

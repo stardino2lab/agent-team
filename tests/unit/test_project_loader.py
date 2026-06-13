@@ -97,12 +97,12 @@ def test_invalid_config_yaml_raises(tmp_path: Path) -> None:
         loader.load_config()
 
 
-def test_build_lead_context_emits_custom_keys(consumer_project: Path) -> None:
+def test_build_lead_context_does_not_leak_unknown_keys(consumer_project: Path) -> None:
     config_path = consumer_project / ".agent-team" / "config.yaml"
     config_path.write_text(
-        config_path.read_text(encoding="utf-8") + "\ncustom_key: value42\n",
+        config_path.read_text(encoding="utf-8") + "\napi_token: ghp_secret_value_xxx\n",
         encoding="utf-8",
     )
     ctx = ProjectLoader(consumer_project).build_lead_context()
-    assert "custom_key" in ctx.text
-    assert "value42" in ctx.text
+    assert "api_token" not in ctx.text
+    assert "ghp_secret_value_xxx" not in ctx.text
