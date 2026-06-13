@@ -122,6 +122,8 @@ def format_event_summary(event: Event) -> str:
             return f"teammate_shutdown {p.get('name', '')}"
         case "session_started":
             return f"session_started {p.get('session_id', '')}"
+        case "orchestrator_stopped":
+            return f"orchestrator_stopped {p.get('session_id', '')}".strip()
         case "teammate_ready":
             return (
                 f"teammate_ready {p.get('name', '')} "

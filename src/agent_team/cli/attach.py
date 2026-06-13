@@ -67,15 +67,19 @@ def attach_cmd(
         f"(this shell drives spawn approvals; do not close it)."
     )
 
-    if no_block:
-        orch.stop_watching()
-        return
-
-    stop_event = threading.Event()
     try:
-        while not stop_event.wait(timeout=0.5):
+        if no_block:
+            return
+        stop_event = threading.Event()
+        try:
+            while not stop_event.wait(timeout=0.5):
+                pass
+        except KeyboardInterrupt:
             pass
-    except KeyboardInterrupt:
-        pass
     finally:
         orch.stop_watching()
+        orch.ctx.event_log.append(
+            orch.ctx.session_dir,
+            type_="orchestrator_stopped",
+            payload={"session_id": session_id, "reason": "user"},
+        )

@@ -323,7 +323,9 @@ def test_start_creates_session_and_session_started_event(
     assert p["session_id"] == "start-unit"
 
     split_calls = [c for c in psmux_backend.recorded_calls if "split-window" in c.args]
-    assert any("python -m agent_team.tui" in " ".join(c.args) for c in split_calls)
+    assert any(
+        "agent-team tui --session start-unit" in " ".join(c.args) for c in split_calls
+    )
 
 
 def test_run_once_skips_malformed_resolution_line(

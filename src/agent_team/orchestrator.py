@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -89,9 +90,12 @@ class Orchestrator:
             members_started: list[str] = ["lead"]
             if not self.ctx.no_psmux:
                 lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
+                # CLI entry (not `python -m agent_team.tui`) so the session id
+                # flows through argv. The module entry needs AGENT_TEAM_SESSION_ID,
+                # which psmux.split_pane has no way to inject.
                 self.ctx.psmux.split_pane(
                     psmux_session,
-                    command="python -m agent_team.tui",
+                    command=f"agent-team tui --session {self.ctx.session_id}",
                     cwd=project_path,
                 )
                 lead.pane_id = lead_pane
@@ -117,7 +121,14 @@ class Orchestrator:
             # Partial start — wipe the half-built session_dir so the next
             # `start --session SAME` is not blocked by an "already exists"
             # check. Safe in S8 dry-run: nothing real is running yet.
-            shutil.rmtree(self.ctx.session_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(self.ctx.session_dir)
+            except OSError as cleanup_exc:
+                print(
+                    "Orchestrator.start cleanup failed for "
+                    f"{self.ctx.session_dir}: {cleanup_exc!r}",
+                    file=sys.stderr,
+                )
             raise
         return session
 

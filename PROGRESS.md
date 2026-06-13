@@ -72,6 +72,12 @@
 
 1. S9 plan gate → real teammate processes (`TeammateRunner(mock=False)` end-to-end + handshake)
 
+### Carried into S9 from S8 reviews
+
+- **Lead pane bootstrap**: `orchestrator.start` opens lead pane via `psmux.new_session` but never `send_keys` the `claude`/`codex` launch command, and never injects `project_loader.build_lead_context(playbook, extra_context)`. In S8 dry-run that is a noop; in S9 the lead must actually run with MCP config + TEAM.md context.
+- **teammate_ready handshake**: currently emitted right after `send_keys`. S9 should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
+- **EventLog tail-by-type API**: `Orchestrator.reconcile_handled` reads the full events.jsonl each attach. Bound it once long-running sessions exist.
+
 ## Blockers
 
 - none

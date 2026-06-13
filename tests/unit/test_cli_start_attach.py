@@ -42,6 +42,7 @@ def test_start_cli_dry_run_creates_session(
 
     events = EventLog().read(session_store.session_dir("e2e-start"))
     assert any(e.type == "session_started" for e in events)
+    assert any(e.type == "orchestrator_stopped" for e in events)
 
 
 def test_start_refuses_when_session_exists(
