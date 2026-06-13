@@ -114,7 +114,8 @@ def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
     payload = send_keys_lines[0][-1]
     assert "claude --mcp-config" in payload
     assert "--strict-mcp-config" in payload
-    assert "--append-system-prompt" in payload
+    assert "--append-system-prompt-file" in payload
+    assert "lead-system-prompt.md" in payload
 
 
 def test_start_refuses_when_session_exists(

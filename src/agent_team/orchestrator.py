@@ -16,12 +16,31 @@ from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
 
+_SUPPORTED_LEAD_CLIS: frozenset[str] = frozenset({"claude"})
+
+
+def _check_lead_cli_supported(cli: str) -> None:
+    """Raise early if config asks for a lead CLI S9 cannot launch.
+
+    Kept at start() entry so an unsupported value never gets as far as
+    creating a session_dir / psmux session — the user just sees a clean
+    NotImplementedError pointing at S11+.
+    """
+    if cli not in _SUPPORTED_LEAD_CLIS:
+        raise NotImplementedError(
+            f"Lead CLI {cli!r} not supported yet "
+            f"(codex/antigravity planned for S11+)"
+        )
+
 
 def _write_lead_mcp_config(session_dir: Path, session_id: str, project_path: Path) -> Path:
     """Render the lead's MCP config JSON to {session_dir}/claude-mcp.json.
 
     Uses json.dumps (not Jinja) so Windows backslashes do not need manual
-    escaping inside the template.
+    escaping inside the template. AGENT_TEAM_HOME is captured from
+    default_base_dir() at write time — env var changes after this function
+    returns do not flow into the file. A fresh `agent-team start` would
+    re-render with the new value.
     """
     config = {
         "mcpServers": {
@@ -41,8 +60,23 @@ def _write_lead_mcp_config(session_dir: Path, session_id: str, project_path: Pat
     return path
 
 
+def _write_lead_system_prompt(session_dir: Path, lead_context_text: str) -> Path:
+    """Write the lead system prompt to {session_dir}/lead-system-prompt.md.
+
+    File-based delivery is the only safe channel: the prompt is multi-line
+    markdown that may contain shell-meta characters (`$`, backticks, quotes,
+    raw newlines). Passing it through psmux send_keys + cmd.exe / PowerShell
+    quoting on Windows mangles or breaks the launch line. Claude reads the
+    file directly via --append-system-prompt-file so no shell interpretation
+    happens.
+    """
+    path = session_dir / "lead-system-prompt.md"
+    path.write_text(lead_context_text, encoding="utf-8")
+    return path
+
+
 def _build_lead_launch_command(
-    cli: str, *, mcp_config: Path, lead_context: str
+    cli: str, *, mcp_config: Path, system_prompt_file: Path
 ) -> str:
     """Compose the lead CLI launch line that gets send_keys'd to the lead pane.
 
@@ -51,12 +85,9 @@ def _build_lead_launch_command(
     intentionally narrow so future additions do not touch Orchestrator.start.
     """
     if cli == "claude":
-        # Escape embedded double quotes in the context so the single outer
-        # quote pair survives the trip through psmux send_keys + the terminal.
-        escaped_context = lead_context.replace('"', '\\"')
         return (
             f'claude --mcp-config "{mcp_config}" --strict-mcp-config '
-            f'--append-system-prompt "{escaped_context}"'
+            f'--append-system-prompt-file "{system_prompt_file}"'
         )
     raise NotImplementedError(
         f"Lead CLI {cli!r} not supported yet "
@@ -114,6 +145,7 @@ class Orchestrator:
         max_teammates = int(config.get("max_teammates", 5))
         playbook_mode = str(config.get("playbook_mode", "guide"))
         lead_cli = str(config.get("lead_cli", "claude"))
+        _check_lead_cli_supported(lead_cli)
 
         psmux_session = self.ctx.session_id
         lead = Member(
@@ -144,10 +176,13 @@ class Orchestrator:
                 lead_context = loader.build_lead_context(
                     playbook_name=playbook, extra_context=context_text
                 )
+                prompt_path = _write_lead_system_prompt(
+                    self.ctx.session_dir, lead_context.text
+                )
                 launch_cmd = _build_lead_launch_command(
                     lead_cli,
                     mcp_config=mcp_config_path,
-                    lead_context=lead_context.text,
+                    system_prompt_file=prompt_path,
                 )
                 lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
                 self.ctx.psmux.send_keys(lead_pane, launch_cmd, enter=True)
@@ -179,9 +214,18 @@ class Orchestrator:
             self.run_once()
             self.start_watching()
         except Exception:
-            # Partial start — wipe the half-built session_dir so the next
-            # `start --session SAME` is not blocked by an "already exists"
-            # check. Safe in S8 dry-run: nothing real is running yet.
+            # Partial start — tear down both sides of the split brain so the
+            # next `start --session SAME` is not blocked by "already exists"
+            # on disk or "duplicate session" on psmux.
+            if not self.ctx.no_psmux:
+                try:
+                    self.ctx.psmux.kill_session(psmux_session)
+                except Exception as psmux_exc:  # noqa: BLE001
+                    print(
+                        "Orchestrator.start psmux cleanup failed for "
+                        f"{psmux_session!r}: {psmux_exc!r}",
+                        file=sys.stderr,
+                    )
             try:
                 shutil.rmtree(self.ctx.session_dir)
             except OSError as cleanup_exc:

@@ -158,6 +158,17 @@ class PsmuxBackend:
             for panes in self._mock_panes.values():
                 panes.discard(safe_target)
 
+    def kill_session(self, name: str) -> None:
+        """Kill an entire psmux session. No-op if the session does not exist."""
+        safe_name = self._validate_session_name(name)
+        try:
+            self._run(["kill-session", "-t", safe_name])
+        except PsmuxCommandError:
+            # No such session - treat as already-cleaned.
+            pass
+        if self._mock:
+            self._mock_panes.pop(safe_name, None)
+
     def list_panes(self, session: str) -> list[PaneInfo]:
         safe_session = self._validate_session_name(session)
         if self._mock:

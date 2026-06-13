@@ -414,16 +414,17 @@ def test_start_sends_keys_to_lead_pane_with_claude_command(
     assert "claude" in payload
     assert "--mcp-config" in payload
     assert "--strict-mcp-config" in payload
+    assert "--append-system-prompt-file" in payload
 
 
-def test_start_sends_lead_context_via_append_system_prompt(
+def test_start_writes_lead_system_prompt_file_with_team_md_content(
     minimal_project: Path,
     session_store: SessionStore,
     psmux_backend: PsmuxBackend,
     persona_registry: PersonaRegistry,
     event_log: EventLog,
 ) -> None:
-    orch, _ = _start_with_minimal(
+    orch, ctx = _start_with_minimal(
         minimal_project,
         session_id="s9-ctx",
         session_store=session_store,
@@ -436,13 +437,16 @@ def test_start_sends_lead_context_via_append_system_prompt(
     finally:
         orch.stop_watching()
 
+    prompt_path = ctx.session_dir / "lead-system-prompt.md"
+    assert prompt_path.exists()
+    body = prompt_path.read_text(encoding="utf-8")
+    assert "minimal-project" in body  # TEAM.md content
+
     send_calls = [
         c for c in psmux_backend.recorded_calls if "send-keys" in c.args
     ]
     keys_arg = send_calls[0].args[send_calls[0].args.index("-l") + 1]
-    assert "--append-system-prompt" in keys_arg
-    # TEAM.md content makes it through build_lead_context()
-    assert "minimal-project" in keys_arg
+    assert str(prompt_path) in keys_arg
 
 
 def test_unsupported_lead_cli_raises_not_implemented(tmp_path: Path) -> None:
@@ -450,8 +454,37 @@ def test_unsupported_lead_cli_raises_not_implemented(tmp_path: Path) -> None:
         _build_lead_launch_command(
             "codex",
             mcp_config=tmp_path / "x.json",
-            lead_context="ignored",
+            system_prompt_file=tmp_path / "prompt.md",
         )
+
+
+def test_start_refuses_unsupported_lead_cli_before_touching_disk(
+    minimal_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+) -> None:
+    config_path = minimal_project / ".agent-team" / "config.yaml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            "lead_cli: claude", "lead_cli: codex"
+        ),
+        encoding="utf-8",
+    )
+    orch, ctx = _start_with_minimal(
+        minimal_project,
+        session_id="s9-bad-cli",
+        session_store=session_store,
+        psmux_backend=psmux_backend,
+        persona_registry=persona_registry,
+        event_log=event_log,
+    )
+    with pytest.raises(NotImplementedError, match="S11"):
+        orch.start(project_path=minimal_project)
+    assert not ctx.session_dir.exists(), (
+        "early validation must abort before session_dir is created"
+    )
 
 
 def test_run_once_skips_malformed_resolution_line(
