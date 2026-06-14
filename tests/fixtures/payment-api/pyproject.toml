@@ -1,0 +1,5 @@
+# Standalone config for the payment-api fixture so a teammate can run
+# `pytest tests/ -q` from this directory during the S10 E2E. This is NOT part
+# of the agent-team package build; the root pyproject ignores tests/fixtures.
+[tool.pytest.ini_options]
+pythonpath = ["src"]

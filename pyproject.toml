@@ -35,6 +35,10 @@ agent_team = ["bundled/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# Consumer-project fixtures carry their own src/ + tests/ (e.g. payment-api for
+# the S10 E2E). They are data for our tests, not part of our own suite — don't
+# collect them.
+addopts = ["--ignore=tests/fixtures"]
 markers = [
     "integration: tests requiring psmux in PATH",
 ]
@@ -42,6 +46,8 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Fixtures are sample consumer projects, not our code — keep our lint off them.
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

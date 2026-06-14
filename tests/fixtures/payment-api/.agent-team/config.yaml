@@ -1,0 +1,9 @@
+project_name: payment-api
+max_teammates: 5
+playbook_mode: guide
+lead_cli: claude
+allowed_personas:
+  - planner
+  - implementer
+  - tester
+  - reviewer
