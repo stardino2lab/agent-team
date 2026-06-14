@@ -16,6 +16,16 @@
 - D9 bounded/filtered reads: `EventLog.read(limit=)` tail (`tail()` delegates); `read_inbox`/`handle_read_messages`/`read_messages` gain an exact `from_` sender filter composing with `since`; `reconcile_handled` bounds its ingest with `_RECONCILE_EVENT_TAIL=2000` (correctness rests on `session.json`, so an aged-out event at worst re-logs one error, never double-spawns).
 - +11 tests (D6×1, D9-read×1, D9-from_×2, D8-get×1, D8-wait×5, D9-reconcile×1). **227 passed** (+11), ruff clean.
 
+## S11b implementation (observability/reliability: D10/D11/D12) @ 2026-06-15
+
+- `cli_registry.py` — `CliSpec.teammate_launch_args: tuple[str, ...] = ()` (D12); codex gets `("--dangerously-bypass-approvals-and-sandbox",)` so its teammate pane runs hands-off (no per-command approval / sandbox / first-run trust prompt). Read by the RUNNER from the registry, never named by the lead — keeps the lead/teammate CLI-decoupling invariant.
+- `psmux_backend.py` — `capture_pane(target) -> str` (D11, `capture-pane -p`; mock returns "") and `pipe_pane(target, log_path)` (D10, `pipe-pane -o 'cat >> "<abs forward-slash path>"'`; `as_posix()` so Windows backslashes aren't mangled by the pane shell). Both validate the pane target.
+- `teammate_runner.py` — `spawn` non-mock branch now: applies registry launch args (D12 `" ".join([cli, *launch_args])`), pipes the pane to `{session_dir}/teammates/<name>/transcript.log` (D10), then `_wait_until_input_ready` (D11, CLI-neutral capture-pane settle/timeout, `_READY_*` constants) before the kickoff so the first keystrokes don't drop during CLI startup. Transcript lives on disk only — never enters lead context (D6), zero lead tokens.
+- `tests/conftest.py` — autouse `_fast_teammate_readiness` fixture patches all three `_READY_*` constants so spawn-calling unit tests don't burn the real timeout (mock `capture_pane` never settles → instant fallback).
+- `cli/logs.py` — `logs export --to <dir>` writes a bundle DIRECTORY: `events.jsonl` + `transcripts/<name>.log` per teammate with a captured transcript (was a single events file).
+- Live behavior (real pipe-pane on Windows, codex no-approval run, capture-pane readiness) is mocked in unit tests — verified manually via `tests/manual/s11b-teammate-hardening.md`.
+- +10 tests (D12×2, capture_pane×2, pipe_pane×2, readiness-helper×2, spawn-wiring×2; logs export updated in place). **237 passed** (+10), ruff clean. Existing `test_spawn_passes_persona_cli_to_split_pane[implementer-codex]` updated to a substring check (the codex command now carries the bypass flag, so the literal CLI name is no longer a standalone argv element).
+
 ## S7 plan review @ 2026-06-10
 
 - `docs/s7-api-sketch.md` — Textual 2×2, watchfiles, spawn modal
