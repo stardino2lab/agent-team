@@ -182,7 +182,10 @@ def test_spawn_passes_persona_cli_to_split_pane(
 
     assert result.cli == expected_cli
     split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
-    assert expected_cli in split.args, (
+    # The literal CLI name reaches psmux as the head of the launch command (which
+    # may also carry registry teammate_launch_args, e.g. codex's bypass flag).
+    joined = " ".join(split.args)
+    assert expected_cli in joined, (
         f"expected literal {expected_cli!r} in split-window args, got {split.args!r}"
     )
 
@@ -201,6 +204,99 @@ def test_kickoff_line_collapses_newlines_from_inputs() -> None:
     line = _kickoff_line("a\nb\rc", Path("/tmp/brief.md"))
     assert "\n" not in line
     assert "\r" not in line
+
+
+def test_wait_until_input_ready_settles_then_returns_true() -> None:
+    from agent_team.teammate_runner import _wait_until_input_ready
+
+    class _FakeCapture:
+        def __init__(self, frames: list[str]) -> None:
+            self._frames = frames
+            self.calls = 0
+
+        def capture_pane(self, target: str) -> str:
+            frame = self._frames[min(self.calls, len(self._frames) - 1)]
+            self.calls += 1
+            return frame
+
+    fake = _FakeCapture(["", "banner ready", "banner ready"])
+    ready = _wait_until_input_ready(
+        fake, "%1", poll_interval=0.0, max_wait=5.0, settle_count=2
+    )
+    assert ready is True
+    assert fake.calls == 3  # empty, then two identical non-empty
+
+
+def test_wait_until_input_ready_times_out_returns_false() -> None:
+    from agent_team.teammate_runner import _wait_until_input_ready
+
+    class _NeverReady:
+        def capture_pane(self, target: str) -> str:
+            return ""
+
+    ready = _wait_until_input_ready(
+        _NeverReady(), "%1", poll_interval=0.0, max_wait=0.02, settle_count=2
+    )
+    assert ready is False
+
+
+def test_spawn_pipes_transcript_waits_then_kickoffs(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    runner.spawn(**_spawn_kwargs(session_dir=session_dir, project_path=project))
+
+    calls = psmux_backend.recorded_calls
+    # D10: the pane is piped to the teammate's transcript.log (forward-slash path).
+    pipe = next(c for c in calls if "pipe-pane" in c.args)
+    transcript = (session_dir / "teammates" / "helper-1" / "transcript.log").resolve()
+    assert transcript.as_posix() in pipe.args[4]
+    # D11: readiness was polled (capture-pane) before the kickoff was sent.
+    assert any("capture-pane" in c.args for c in calls)
+
+    def first_index(kind: str) -> int:
+        return next(i for i, c in enumerate(calls) if kind in c.args)
+
+    # Ordering: split-window → pipe-pane → capture-pane → send-keys.
+    assert first_index("split-window") < first_index("pipe-pane")
+    assert first_index("pipe-pane") < first_index("capture-pane")
+    assert first_index("capture-pane") < first_index("send-keys")
+
+    # Regression: a claude teammate gets NO codex bypass flag (launch_args == ()).
+    split = next(c for c in calls if "split-window" in c.args)
+    assert "--dangerously-bypass-approvals-and-sandbox" not in " ".join(split.args)
+
+
+def test_spawn_codex_applies_bypass_launch_args(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    # 'implementer' persona has cli: codex (bundled).
+    runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="helper-impl",
+            persona="implementer",
+        )
+    )
+    split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
+    joined = " ".join(split.args)
+    # D12: codex teammate launched non-interactively, args from the registry.
+    assert "codex" in joined
+    assert "--dangerously-bypass-approvals-and-sandbox" in joined
 
 
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:

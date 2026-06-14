@@ -2,15 +2,56 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from agent_team._io import format_ts, utc_now
 from agent_team.bundled_paths import render_bundled_template
+from agent_team.cli_registry import get_cli_spec
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
 
 _MOCK_COMMAND = 'python -c "print(\'dry-run teammate ready\')"'
+
+# D11 input-readiness tuning. The teammate CLI is not reading stdin the instant
+# its pane is split, so an eager kickoff drops. Poll the pane until its output
+# settles (CLI at its input prompt), then send. Tests patch these to be instant.
+_READY_POLL_INTERVAL_S = 0.25
+_READY_MAX_WAIT_S = 8.0
+_READY_SETTLE_COUNT = 2
+
+
+def _wait_until_input_ready(
+    psmux: object,
+    pane_id: str,
+    *,
+    poll_interval: float,
+    max_wait: float,
+    settle_count: int,
+) -> bool:
+    """Block until the teammate CLI pane looks ready for input, or max_wait (D11).
+
+    CLI-neutral heuristic: capture the pane repeatedly; once its output is
+    non-empty and unchanged across `settle_count` consecutive polls, the CLI has
+    finished its startup banner and is at its input prompt. Returns True if it
+    settled, False on timeout — the caller sends the kickoff either way (the
+    fallback covers CLIs whose output never fully settles).
+    """
+    prev: str | None = None
+    same = 0
+    deadline = time.monotonic() + max_wait
+    while time.monotonic() < deadline:
+        cur = psmux.capture_pane(pane_id)
+        if cur and cur == prev:
+            same += 1
+            if same >= settle_count:
+                return True
+        else:
+            same = 1 if cur else 0
+        prev = cur
+        time.sleep(poll_interval)
+    return False
 
 
 def _kickoff_line(teammate_name: str, brief_path: Path) -> str:
@@ -107,15 +148,29 @@ class TeammateRunner:
                 ),
                 encoding="utf-8",
             )
+            # D12: per-CLI launch args from the registry (e.g. codex non-interactive
+            # approval/sandbox bypass). Read by the RUNNER, never named by the lead.
+            launch_args = get_cli_spec(p.cli).teammate_launch_args
+            command = " ".join([p.cli, *launch_args])
             # Run the teammate CLI from the project root so relative file edits,
-            # pytest, and git target the real checkout. Trigger it with a
-            # single-line kickoff pointing at the absolute brief path.
+            # pytest, and git target the real checkout.
             pane_id = self.psmux.split_pane(
-                psmux_session, command=p.cli, cwd=project_path
+                psmux_session, command=command, cwd=project_path
             )
-            # Resolve to an absolute path: the teammate runs from the project
-            # cwd, so a relative brief path (possible when AGENT_TEAM_HOME is
-            # relative) would not be locatable.
+            # D10: capture the pane's full output to a durable per-teammate
+            # transcript (coordination events + mail do NOT capture its work).
+            transcript_path = teammate_dir / "transcript.log"
+            self.psmux.pipe_pane(pane_id, transcript_path)
+            # D11: wait until the CLI is reading stdin before the kickoff, else
+            # the first keystrokes drop during CLI startup.
+            _wait_until_input_ready(
+                self.psmux,
+                pane_id,
+                poll_interval=_READY_POLL_INTERVAL_S,
+                max_wait=_READY_MAX_WAIT_S,
+                settle_count=_READY_SETTLE_COUNT,
+            )
+            # Trigger with a single-line kickoff pointing at the absolute brief path.
             self.psmux.send_keys(
                 pane_id, _kickoff_line(teammate_name, brief_path.resolve()), enter=True
             )

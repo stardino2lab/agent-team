@@ -15,6 +15,21 @@ from agent_team.spawn_approval import SpawnApproval
 from agent_team.tui.context import resolve_tui_context
 
 
+@pytest.fixture(autouse=True)
+def _fast_teammate_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the D11 input-readiness wait near-instant in unit tests.
+
+    Mock psmux returns "" from capture_pane (never 'settles'), so spawn would
+    otherwise burn the full real timeout per call. These tiny values make the
+    fallback fire immediately; the real timing is exercised in tests/manual.
+    """
+    from agent_team import teammate_runner
+
+    monkeypatch.setattr(teammate_runner, "_READY_POLL_INTERVAL_S", 0.0)
+    monkeypatch.setattr(teammate_runner, "_READY_MAX_WAIT_S", 0.02)
+    monkeypatch.setattr(teammate_runner, "_READY_SETTLE_COUNT", 1)
+
+
 @pytest.fixture
 def empty_global_personas(tmp_path: Path) -> Path:
     """Isolated global personas dir (missing = skip layer)."""
