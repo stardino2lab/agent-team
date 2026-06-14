@@ -106,3 +106,22 @@ def test_build_lead_context_does_not_leak_unknown_keys(consumer_project: Path) -
     ctx = ProjectLoader(consumer_project).build_lead_context()
     assert "api_token" not in ctx.text
     assert "ghp_secret_value_xxx" not in ctx.text
+
+
+def test_build_lead_context_prepends_orchestration_preamble(consumer_project: Path) -> None:
+    loader = ProjectLoader(consumer_project)
+    ctx = loader.build_lead_context()
+
+    text = ctx.text
+    # D6: locks the low-token property structurally — lead orchestrates, never codes.
+    assert "You are the team LEAD" in text
+    assert "NEVER read, edit, write, or review project code yourself" in text
+    # D8 line folded into the preamble: no shell-loop polling, use wait_for_event.
+    assert "Do NOT poll with shell loops" in text
+    assert "wait_for_event" in text
+    # D9 line: tell the lead to filter reads, not pull everything.
+    assert "since/from_/limit" in text
+    # Terse-output line (D6 verbose-self-summary fix).
+    assert "terse" in text.lower()
+    # The preamble frames the prompt — it must come BEFORE the project material.
+    assert text.index("You are the team LEAD") < text.index("--- TEAM.md ---")
