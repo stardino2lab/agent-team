@@ -344,3 +344,70 @@ def test_get_recent_events_returns_since_and_limit(mcp_context: McpContext) -> N
     cutoff = all_evt[1]["ts"]
     later = handle_get_recent_events(mcp_context, since=cutoff)["events"]
     assert [e["payload"]["n"] for e in later] == [2]
+
+
+def test_wait_for_event_returns_existing_match(mcp_context: McpContext) -> None:
+    from agent_team.mcp_server import handle_wait_for_event
+
+    mcp_context.event_log.append(
+        mcp_context.session_dir, type_="teammate_ready", payload={"name": "helper-1"}
+    )
+    result = handle_wait_for_event(
+        mcp_context, types=["teammate_ready"], timeout=5.0
+    )
+    assert result["timed_out"] is False
+    assert [e["type"] for e in result["events"]] == ["teammate_ready"]
+
+
+def test_wait_for_event_times_out(mcp_context: McpContext) -> None:
+    from agent_team.mcp_server import handle_wait_for_event
+
+    result = handle_wait_for_event(
+        mcp_context, types=["teammate_ready"], timeout=0.3
+    )
+    assert result["timed_out"] is True
+    assert result["events"] == []
+
+
+def test_wait_for_event_ignores_other_types(mcp_context: McpContext) -> None:
+    from agent_team.mcp_server import handle_wait_for_event
+
+    mcp_context.event_log.append(
+        mcp_context.session_dir, type_="mail_sent", payload={"id": "x"}
+    )
+    result = handle_wait_for_event(
+        mcp_context, types=["teammate_ready"], timeout=0.3
+    )
+    assert result["timed_out"] is True
+    assert result["events"] == []
+
+
+def test_wait_for_event_wakes_on_new_event(mcp_context: McpContext) -> None:
+    import threading
+
+    from agent_team.mcp_server import handle_wait_for_event
+
+    sd = mcp_context.session_dir
+    el = mcp_context.event_log
+    # Append the event ~0.3s into the wait; the watcher must wake well before the
+    # 5s timeout. Generous timeout keeps this robust on slow CI.
+    timer = threading.Timer(
+        0.3, lambda: el.append(sd, type_="teammate_ready", payload={"name": "helper-1"})
+    )
+    timer.start()
+    try:
+        result = handle_wait_for_event(
+            mcp_context, types=["teammate_ready"], timeout=5.0
+        )
+    finally:
+        timer.cancel()
+
+    assert result["timed_out"] is False
+    assert any(e["type"] == "teammate_ready" for e in result["events"])
+
+
+def test_wait_for_event_rejects_empty_types(mcp_context: McpContext) -> None:
+    from agent_team.mcp_server import McpToolError, handle_wait_for_event
+
+    with pytest.raises(McpToolError):
+        handle_wait_for_event(mcp_context, types=[], timeout=0.3)

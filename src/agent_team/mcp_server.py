@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import watchfiles
 from mcp.server.fastmcp import FastMCP
 
 from agent_team import tasks
@@ -125,6 +128,7 @@ def _map_tool_error(exc: BaseException) -> str:
             tasks.TaskStateError,
             ProjectConfigError,
             PsmuxCommandError,
+            OSError,
             ValueError,
         ),
     ):
@@ -267,11 +271,68 @@ def _event_to_dict(event) -> dict:
     return {"type": event.type, "ts": event.ts, "payload": event.payload}
 
 
+# wait_for_event tuning. The lead makes ONE blocking call and burns no tokens
+# while it waits, replacing shell-loop polling (D8). watchfiles wakes immediately
+# (~50ms) on a real events.jsonl write via OS notifications; _WAIT_SAFETY_SLICE_MS
+# only bounds the idle re-check cadence and the tiny write-between-immediate-check-
+# and-watch-start race window. 500ms keeps worst-case race recovery snappy while
+# idle re-reads stay negligible (a few file reads, lead burns no tokens).
+_DEFAULT_WAIT_TIMEOUT = 60.0
+_WAIT_SAFETY_SLICE_MS = 500
+
+
+def _matching_events(ctx: McpContext, types: list[str], since: str | None) -> list:
+    wanted = set(types)
+    return [
+        e for e in ctx.event_log.read(ctx.session_dir, since=since) if e.type in wanted
+    ]
+
+
 def handle_get_recent_events(
     ctx: McpContext, since: str | None = None, limit: int | None = None
 ) -> dict:
     events = ctx.event_log.read(ctx.session_dir, since=since, limit=limit)
     return {"events": [_event_to_dict(e) for e in events]}
+
+
+def handle_wait_for_event(
+    ctx: McpContext,
+    types: list[str],
+    since: str | None = None,
+    timeout: float | None = None,
+) -> dict:
+    if not types:
+        raise McpToolError("wait_for_event requires at least one event type")
+    timeout = _DEFAULT_WAIT_TIMEOUT if timeout is None else float(timeout)
+
+    matches = _matching_events(ctx, types, since)
+    if matches:
+        return {"events": [_event_to_dict(e) for e in matches], "timed_out": False}
+
+    deadline = time.monotonic() + timeout
+    # rust_timeout caps the idle wait per cycle; for short timeouts it equals the
+    # whole budget so the call returns promptly instead of after a fixed 2s slice.
+    slice_ms = max(1, int(min(timeout, _WAIT_SAFETY_SLICE_MS / 1000) * 1000))
+    stop = threading.Event()
+    try:
+        for _changes in watchfiles.watch(
+            ctx.session_dir,
+            stop_event=stop,
+            rust_timeout=slice_ms,
+            yield_on_timeout=True,
+        ):
+            matches = _matching_events(ctx, types, since)
+            if matches:
+                return {
+                    "events": [_event_to_dict(e) for e in matches],
+                    "timed_out": False,
+                }
+            if time.monotonic() >= deadline:
+                break
+    finally:
+        # Stop the watchfiles Rust thread regardless of how we exit.
+        stop.set()
+    return {"events": [], "timed_out": True}
 
 
 def _run_tool(handler, *args, **kwargs):
@@ -320,6 +381,21 @@ def get_recent_events(since: str | None = None, limit: int | None = None) -> dic
     `limit` to cap how many are returned. Use wait_for_event to BLOCK for the next one.
     """
     return _run_tool(handle_get_recent_events, since, limit)
+
+
+@mcp.tool()
+def wait_for_event(
+    types: list[str], since: str | None = None, timeout: float | None = None
+) -> dict:
+    """Block until a coordination event of the given types is emitted, or timeout.
+
+    Event-driven (no polling). Use this to wait for a stage to finish — e.g.
+    wait_for_event(["teammate_ready"]) after a spawn, or wait_for_event(
+    ["task_completed", "mail_sent"], since=<ts>) for a working teammate — instead
+    of arming a shell watcher. Pass `since` (ISO ts) to ignore older events.
+    Returns {"events": [...], "timed_out": bool}; timeout defaults to 60s.
+    """
+    return _run_tool(handle_wait_for_event, types, since, timeout)
 
 
 @mcp.tool()
