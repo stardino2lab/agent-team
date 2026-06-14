@@ -2,6 +2,8 @@
 
 Copy this block into the milestone plan or review prompt. Replace `{N}`, paths, and axes per IMPLEMENTATION §.
 
+The axes below (E1…) are **candidates** — include only the ones this change touches (≥1, no fixed count, no upper cap).
+
 ## Milestone `{N}` — plan review axes
 
 | ID | Focus | Checklist |
@@ -56,7 +58,7 @@ E1 Commands, E2 CLI UX, E3 Integration, E4 Tests, E5 Downstream (S6 MCP)
 
 ```
 - [ ] Mode: plan | code
-- [ ] N experts defined (4–6)
+- [ ] N experts defined (≥1, one per applicable axis)
 - [ ] File list attached to each prompt
 - [ ] All Task calls in one parallel batch
 - [ ] readonly: true

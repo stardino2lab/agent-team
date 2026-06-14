@@ -29,13 +29,15 @@ Do not edit plan files (`.cursor/plans/*.plan.md`) unless the user explicitly as
 
 ## Expert count
 
-| Milestone shape | Experts |
-|-----------------|---------|
-| Core data / thin layer | 4 |
-| + CLI, packaging, init | 5 |
-| + templates, extra surface | 6 |
+**N = one expert per review axis that the change actually touches.** No fixed default, no upper cap, minimum 1 — decide per change each time.
 
-Default **5** when unsure. Each expert = one Task with a focused checklist.
+1. List the axes this change touches (candidates: Schema, API, Tests, Security, Downstream, CLI-UX, Packaging, Integration, …).
+2. Keep only the axes that apply to *this* milestone/diff.
+3. One expert = one applicable axis = one focused Task.
+
+Include exactly the axes that apply — no more, no fewer. Avoid over-splitting a single concern across multiple experts.
+
+Past sizing examples (history, not a rule): S1=4, S2=5, S3=5 — see [axes-template.md](axes-template.md).
 
 ## Subagent prompt shape
 
@@ -96,7 +98,7 @@ Launch all experts in **one message** (parallel Task calls).
 **Before** writing implementation code.
 
 1. Ensure API sketch exists (`docs/s{N}-api-sketch.md`) — create if milestone plan says so.
-2. Assign 4–6 expert axes (Schema, API, Tests, Downstream, + milestone-specific).
+2. Assign the expert axes that apply (≥1, one per applicable axis — e.g. Schema, API, Tests, Downstream, + milestone-specific).
 3. Parallel plan review on **sketch + docs**, not implementation.
 4. **BLOCKING=0** → implement. P1 → update sketch/spec, then re-review affected experts only.
 5. Do not commit until implementation + code gate (unless user only wanted plan gate).
