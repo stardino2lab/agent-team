@@ -32,10 +32,11 @@ payment-api/
 ### 1. Start
 
 ```powershell
-cd payment-api
+cd $env:USERPROFILE\payment-api
 git checkout -b feature/refund-api
-agent-team init   # if not done
-agent-team start --playbook new-feature
+# --project is required; "." = this dir. Session id defaults to the dir name
+# (payment-api).
+agent-team start --project . --playbook new-feature
 ```
 
 Expected psmux: `[ Lead | TUI | empty ]`
