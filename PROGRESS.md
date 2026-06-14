@@ -130,7 +130,7 @@ teammate_ready`. The smoke + a high-effort code review surfaced and fixed real b
 ### Carried into S9+ from earlier reviews
 
 - ✅ ~~Lead pane bootstrap~~ — S9 code-complete 에서 처리. CLI registry seam PR이 enum 추상화까지 마무리.
-- **teammate_ready handshake**: currently emitted right after `send_keys`. S10+ should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
+- ✅ ~~teammate_ready handshake~~ — done in S10b: teammate writes a ready marker via `agent-team teammate ready`; orchestrator `poll_ready` (teammates-dir watcher) emits teammate_ready only then.
 - ✅ ~~Teammate prompt newlines (review #5)~~ — fixed in S10a: single-line kickoff via `_kickoff_line`; full role/task context lives in the brief file.
 - ✅ ~~Teammate cwd (review #7)~~ — fixed in S10a: teammate pane cwd is the project root; brief stays in the session scratch dir (no pollution).
 - **EventLog tail-by-type API**: `Orchestrator.reconcile_handled` reads the full events.jsonl each attach. Bound it once long-running sessions exist.
@@ -149,8 +149,22 @@ relative `AGENT_TEAM_HOME` can't hide the brief from the project-cwd teammate) +
 test hardening (direct `_kickoff_line` tests, brief-content lock). 208 passed,
 ruff clean.
 
-Remaining S10 slices: S10b real `teammate_ready` handshake; S10c payment-api
-fixture + codex teammate (same CLI-neutral launch); S10d manual E2E.
+Remaining S10 slices: S10c payment-api fixture + codex teammate (same
+CLI-neutral launch); S10d manual E2E.
+
+### S10b — real teammate_ready handshake (2026-06-15)
+
+Marker-file handshake: teammate runs `agent-team teammate ready` → orchestrator
+`poll_ready` (teammates-dir watcher, RLock-serialized with the approval watcher)
+emits `teammate_ready` only when the marker appears. `Member` gains `request_id`
+(persisted); status goes `starting → running`; `reconcile_handled` treats a
+member's request_id as the authoritative "already spawned" signal so a
+detach/attach before readiness never re-spawns. No new event type, no blocking
+wait, no timeout (deferred). Spec: `docs/superpowers/specs/2026-06-15-s10b-*`.
+
+5-expert code-review gate: 1 BLOCKING fixed (lock `reconcile_handled`'s mutation
+of the shared handled set) + 1 P1 (independent per-watcher start guards). 212
+passed, ruff clean.
 
 ## Blockers
 

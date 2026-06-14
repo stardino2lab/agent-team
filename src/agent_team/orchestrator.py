@@ -152,27 +152,32 @@ class Orchestrator:
         self._lock = threading.RLock()
 
     def start_watching(self) -> None:
-        """Watch approval/ (run_once) and teammates/ (poll_ready) for changes."""
-        if self._watcher is not None:
-            return
-        approval_dir = self.ctx.session_dir / "approval"
-        approval_dir.mkdir(parents=True, exist_ok=True)
-        self._watcher = FileWatcher(
-            approval_dir,
-            self.run_once,
-            label="ResolutionWatcher",
-        )
-        self._watcher.start()
+        """Watch approval/ (run_once) and teammates/ (poll_ready) for changes.
 
-        teammates_dir = self.ctx.session_dir / "teammates"
-        teammates_dir.mkdir(parents=True, exist_ok=True)
-        self._ready_watcher = FileWatcher(
-            teammates_dir,
-            self.poll_ready,
-            recursive=True,
-            label="ReadyWatcher",
-        )
-        self._ready_watcher.start()
+        Each watcher is guarded independently so a partial-start (one created,
+        the other not) is repaired on the next call rather than leaving the
+        ready watcher permanently off.
+        """
+        if self._watcher is None:
+            approval_dir = self.ctx.session_dir / "approval"
+            approval_dir.mkdir(parents=True, exist_ok=True)
+            self._watcher = FileWatcher(
+                approval_dir,
+                self.run_once,
+                label="ResolutionWatcher",
+            )
+            self._watcher.start()
+
+        if self._ready_watcher is None:
+            teammates_dir = self.ctx.session_dir / "teammates"
+            teammates_dir.mkdir(parents=True, exist_ok=True)
+            self._ready_watcher = FileWatcher(
+                teammates_dir,
+                self.poll_ready,
+                recursive=True,
+                label="ReadyWatcher",
+            )
+            self._ready_watcher.start()
 
     def stop_watching(self) -> None:
         if self._watcher is not None:
@@ -320,15 +325,18 @@ class Orchestrator:
             m.request_id for m in session.members if m.request_id is not None
         }
 
-        for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
-            if res.decision == "denied":
-                self._handled_request_ids.add(res.request_id)
-            elif res.request_id in ready_request_ids:
-                self._handled_request_ids.add(res.request_id)
-            elif res.request_id in member_request_ids:
-                self._handled_request_ids.add(res.request_id)
-            elif res.teammate_name and res.teammate_name in teammate_names:
-                self._handled_request_ids.add(res.request_id)
+        # Mutating the shared handled set under the lock keeps it consistent with
+        # run_once (the approval watcher thread), which reads+writes it too.
+        with self._lock:
+            for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
+                if res.decision == "denied":
+                    self._handled_request_ids.add(res.request_id)
+                elif res.request_id in ready_request_ids:
+                    self._handled_request_ids.add(res.request_id)
+                elif res.request_id in member_request_ids:
+                    self._handled_request_ids.add(res.request_id)
+                elif res.teammate_name and res.teammate_name in teammate_names:
+                    self._handled_request_ids.add(res.request_id)
 
     def run_once(self) -> int:
         with self._lock:
