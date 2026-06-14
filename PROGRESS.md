@@ -149,7 +149,17 @@ relative `AGENT_TEAM_HOME` can't hide the brief from the project-cwd teammate) +
 test hardening (direct `_kickoff_line` tests, brief-content lock). 208 passed,
 ruff clean.
 
-Remaining S10 slices: S10d manual E2E.
+Remaining: the S10d manual E2E **run** (human-driven; see below).
+
+### S10d — manual E2E gate prepared (2026-06-15)
+
+`tests/manual/s10-payment-api-e2e.md` refreshed to match the implemented
+behavior: copy the fixture to a writable dir, the readiness handshake step
+(teammates run `agent-team teammate ready`; teammate_ready is deferred; Team
+panel shows starting→running), teammate cwd = project root, and pass criteria
+covering the full audit trail + detach/attach durability. The actual run needs
+real Claude + Codex CLIs doing work and human observation — it cannot be
+automated; hand off to the user like the S9 smoke.
 
 ### S10c — payment-api fixture + codex teammate (2026-06-15)
 
@@ -197,4 +207,4 @@ passed, ruff clean.
 | S7 | done |
 | S8 | done |
 | S9 | done (manual smoke passed 2026-06-14) |
-| S10 | in progress (S10a done 2026-06-14) |
+| S10 | code complete (S10a-c done 2026-06-15); manual E2E pending |
