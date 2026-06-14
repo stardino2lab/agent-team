@@ -8,7 +8,7 @@ Windows-native multi-agent orchestrator for Claude CLI and Codex CLI.
 
 ## Status
 
-**S7 complete — next S8 orchestrator** — [한글 현황](docs/STATUS.ko.md) · [진행 로그](PROGRESS.ko.md) · [시각 현황](docs/blueprints/status.html) · [agent tracker](PROGRESS.md)
+**S10 complete (payment-api real-token E2E passed) — next S11 multi-CLI + $20-lead hardening** — [한글 현황](docs/STATUS.ko.md) · [진행 로그](PROGRESS.ko.md) · [시각 현황](docs/blueprints/status.html) · [agent tracker](PROGRESS.md) · [S11/S12 계획](docs/s11-multi-cli-plan.md)
 
 | Doc | Purpose |
 |-----|---------|

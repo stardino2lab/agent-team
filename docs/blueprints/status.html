@@ -137,8 +137,8 @@
 <body>
   <h1>agent-team 구현 현황</h1>
   <p class="summary">
-    <strong>S7 Textual TUI 완료</strong> — 다음 <strong>S8 오케스트레이터</strong>.
-    테스트 134 passed, 1 skipped.
+    <strong>S10 payment-api 실토큰 E2E 통과</strong> — 다음 <strong>S11 멀티-CLI + $20-lead 하드닝</strong>.
+    테스트 216 passed.
   </p>
 
   <div class="legend">
@@ -165,9 +165,11 @@
       <tr class="done"><td>S5</td><td>완료</td><td>Spawn 승인 큐</td><td><a href="../s5-api-sketch.md">s5 sketch</a></td></tr>
       <tr class="done"><td>S6</td><td>완료</td><td>MCP 서버 (팀 리드 도구)</td><td><a href="../s6-api-sketch.md">s6 sketch</a></td></tr>
       <tr class="done"><td>S7</td><td>완료</td><td>Textual TUI</td><td><a href="../s7-api-sketch.md">s7 sketch</a> · <a href="s7-tui.html">와이어프레임</a></td></tr>
-      <tr class="next"><td>S8</td><td>다음</td><td>오케스트레이터 dry-run</td><td>—</td></tr>
-      <tr><td>S9</td><td>예정</td><td>Claude 리드 E2E (수동)</td><td>—</td></tr>
-      <tr><td>S10</td><td>예정</td><td>payment-api E2E (수동)</td><td>—</td></tr>
+      <tr class="done"><td>S8</td><td>완료</td><td>오케스트레이터 dry-run (start/attach)</td><td><a href="../s8-api-sketch.md">s8 sketch</a></td></tr>
+      <tr class="done"><td>S9</td><td>완료</td><td>Claude 리드 통합 (수동 스모크 통과)</td><td><a href="../s9-api-sketch.md">s9 sketch</a></td></tr>
+      <tr class="done"><td>S10</td><td>완료</td><td>payment-api 실토큰 E2E 통과</td><td><a href="../IMPLEMENTATION.md">§S10</a></td></tr>
+      <tr class="next"><td>S11</td><td>다음</td><td>멀티-CLI (codex 2nd lead) + $20-lead 하드닝</td><td><a href="../s11-multi-cli-plan.md">s11 plan</a></td></tr>
+      <tr><td>S12</td><td>예정</td><td>Gemini/Antigravity (G0–G6 검증 후)</td><td><a href="../s11-multi-cli-plan.md">s11 plan §S12</a></td></tr>
     </tbody>
   </table>
 
@@ -256,8 +258,9 @@ flowchart TB
       { id: "S0", s: "done" }, { id: "S1", s: "done" }, { id: "S2", s: "done" },
       { id: "S3", s: "done" }, { id: "S4", s: "done" }, { id: "S5", s: "done" },
       { id: "S6", s: "done" }, { id: "S7", s: "done" },
-      { id: "S8", s: "next" },
-      { id: "S9", s: "pending" }, { id: "S10", s: "pending" },
+      { id: "S8", s: "done" }, { id: "S9", s: "done" }, { id: "S10", s: "done" },
+      { id: "S11", s: "next" },
+      { id: "S12", s: "pending" },
     ];
     const grid = document.getElementById("gates");
     gates.forEach(g => {

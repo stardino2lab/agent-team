@@ -29,7 +29,7 @@
 ## 5. Non-Goals (Phase 1)
 
 - Web dashboard (Phase 2)
-- Codex as team lead (Phase 2)
+- Codex as team lead (Phase 2 — now scheduled as **S11c**; Gemini/Antigravity as **S12**)
 - WSL / Linux support
 - Nested agent teams (teammates spawning teammates)
 
@@ -63,13 +63,16 @@
 | NFR-05 | Single source of truth: session dir JSON/JSONL |
 | NFR-06 | Milestone delivery: implement → verify → user approve → commit |
 
-## 8. Success Metrics (MVP / S10)
+## 8. Success Metrics (MVP / S10) — ✅ met 2026-06-15
 
-- [ ] `payment-api` fixture: init + start + playbook new-feature
-- [ ] Spawn approval + mailbox visible in TUI
-- [ ] events.jsonl exportable
-- [ ] psmux detach/attach preserves session
-- [ ] 40+ pytest tests passing at S8
+- [x] `payment-api` fixture: init + start + playbook new-feature
+- [x] Spawn approval + mailbox visible in TUI
+- [x] events.jsonl exportable
+- [x] psmux detach/attach preserves session (`agent-team attach`)
+- [x] 40+ pytest tests passing at S8 (216 passing at S10)
+
+S10 manual E2E passed with real tokens: a heterogeneous Claude+Codex team under a
+Claude lead built a refund feature, tests green, reviewer APPROVED.
 
 ## 9. Constraints
 
@@ -79,4 +82,5 @@
 
 ## 10. Milestones
 
-See [IMPLEMENTATION.md](IMPLEMENTATION.md): P0 → S0 … S10.
+- **P0 → S10** — [IMPLEMENTATION.md](IMPLEMENTATION.md). All complete (S10 E2E passed 2026-06-15).
+- **S11 / S12** — multi-CLI (codex 2nd lead, Gemini/Antigravity) + $20-lead token/observability hardening: [s11-multi-cli-plan.md](s11-multi-cli-plan.md).

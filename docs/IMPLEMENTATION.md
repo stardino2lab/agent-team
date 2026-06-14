@@ -1,7 +1,13 @@
 # IMPLEMENTATION — S0 through S10
 
-Milestone spec for `c:\DEV\agent-team`.  
+Milestone spec for the agent-team orchestrator.  
 **Workflow:** implement → `pytest` / checklist → report → user approve → commit → (optional) push.
+
+**Status (2026-06-15):** S0–S10 complete. S10 payment-api E2E passed with real
+tokens (Claude lead + Codex/Claude teammates). Full suite **216 passed**, ruff
+clean. **S11/S12** (multi-CLI: codex 2nd lead + Gemini/Antigravity, plus
+$20-lead token/observability hardening) are specced separately in
+[s11-multi-cli-plan.md](s11-multi-cli-plan.md) — not in this file.
 
 ---
 
@@ -153,46 +159,51 @@ agent-team --help   # optional stub
 
 ---
 
-## S8 — Orchestrator dry-run
+## S8 — Orchestrator dry-run (done)
 
-**Files:** `src/agent_team/orchestrator.py`, `teammate_runner.py` (mock), `cli/start.py`, `cli/attach.py`
+**Files:** `src/agent_team/orchestrator.py`, `teammate_runner.py` (mock), `cli/start.py`, `cli/attach.py`, `_watcher.py`
 
-**Flag:** `--dry-run` uses echo mock teammates, no real psmux required option `--no-psmux`
+**Flag:** `--dry-run` uses mock teammates, no real psmux required option `--no-psmux`; `--no-block` test seam.
 
-**Verify:** full dry-run cycle; 40+ total pytest
+**Delivered:** `run_once()` idempotent + `reconcile_handled()` restart-safe lifecycle; `max_teammates` cap re-validated (`error` event); s7 `SessionWatcher` extracted to a generic `FileWatcher`.
+
+**Verify:** full dry-run cycle; **163 passed**.
 
 **Commit:** `feat(s8): orchestrator dry-run`
 
 ---
 
-## S9 — Claude lead gate (LLM)
+## S9 — Claude lead gate (LLM) — done (manual smoke passed 2026-06-14)
 
-**Manual checklist:** `tests/manual/s9-claude-lead.md`
+**Manual checklist:** `tests/manual/s9-claude-lead.md`. **Fixture:** `tests/fixtures/minimal-project/`.
 
-**Note:** `tests/fixtures/minimal-project/` is created in S8/S9 (not required for P0 docs).
+**Delivered:** `_build_lead_launch_command` (claude branch; codex/antigravity gated to S11+), `_write_lead_mcp_config` (`{session_dir}/claude-mcp.json`), `bundled_paths.render_bundled_template`, and the data-only `cli_registry.py` seam (`CliSpec` + `claude`/`codex`; enum lookups replaced). Lead launches via `send_keys(claude --mcp-config … --strict-mcp-config --append-system-prompt …)` resolved through `shutil.which`.
 
-1. psmux + `agent-team start` (no dry-run)
-2. Claude lead + MCP config
-3. One `spawn_teammate` → TUI approve
-4. events.jsonl entry present
+**Manual smoke:** psmux (tmux 3.3.5 Win port) + claude 2.1.175 — `list_personas`/`spawn_teammate` over MCP, TUI approval, teammate pane + rendered AGENTS.md, audit trail `session_started → spawn_requested → spawn_approved → teammate_ready`. Several real bugs fixed (literal "Enter", bare `claude` resolution, frozen TUI count, non-atomic `write_json`, bare `"python"`).
 
-**Commit:** `feat(s9): claude lead integration verified`
+**Commit:** `feat(s9): claude lead bootstrap + teammate AGENTS.md` (+ smoke fixes)
 
 ---
 
-## S10 — payment-api E2E (LLM)
+## S10 — payment-api E2E (LLM) — done (manual E2E passed 2026-06-15)
 
-**Fixture:** `tests/fixtures/payment-api/` or external `c:\DEV\payment-api`
+**Fixture:** `tests/fixtures/payment-api/` (4 personas, TEAM.md, minimal `PaymentService` + tests, new-feature playbook, standalone pyproject).
 
-**Manual:** playbook new-feature, refund API scenario
+**Delivered (S10a–c):** teammate pane cwd = project root + single-line "read your brief" kickoff (S10a); real `teammate_ready` handshake via `agent-team teammate ready` marker + `poll_ready` watcher, `Member.request_id` persisted (S10b); payment-api fixture + codex teammate via CLI-neutral launch (S10c).
 
-**Commit:** `feat(s10): payment-api e2e playbook`
+**Manual E2E (S10d):** heterogeneous team planner(claude) → implementer(codex) → tester(codex) → reviewer(claude) under a claude/Opus lead built the refund feature; `pytest tests/ -q` → 4 passed, reviewer APPROVED. Follow-ups folded into S11: D10 (transcript), D11 (kickoff input-readiness), D12 (codex non-interactive approvals).
+
+**Verify:** **216 passed**, ruff clean.
+
+**Commit:** `feat(s10c)` + `docs(s10): manual E2E PASSED`
 
 ---
 
 ## Test matrix summary
 
-| Milestone | New tests (min) | Cumulative |
+Minimums planned per milestone (actual cumulative tracked in [PROGRESS.md](../PROGRESS.md)):
+
+| Milestone | New tests (min) | Cumulative (min) |
 |-----------|-----------------|------------|
 | S0 | 1 | 1 |
 | S1 | 12 | 13 |
@@ -203,6 +214,8 @@ agent-team --help   # optional stub
 | S6 | 10 | 48 |
 | S7 | 4 | 52 |
 | S8 | 8 | 60 |
+
+**Actual cumulative (2026-06-15): 216 passed** (S7 hardening, S8 14, S9 registry seam, S10a–c, plus S0–S6 review regressions all landed above the per-milestone minimums).
 
 ---
 

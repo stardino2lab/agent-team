@@ -1,10 +1,13 @@
 # Progress
 
-## Current: S9 code-complete on main — Next: S9 manual smoke + S10
+## Current: S10 done (real-token E2E passed) on main — Next: S11 (multi-CLI + $20-lead token/observability hardening)
 
-## Last completed: S6 @ 2026-06-10
+## Last completed: S10 payment-api E2E @ 2026-06-15 — PASSED
 
-- `mcp_server.py` — 9 MCP tools; on main
+- Heterogeneous team (claude+codex) built `PaymentService.refund` + tests under a
+  claude/Opus lead; `pytest tests/ -q` → 4 passed, reviewer APPROVED. Real
+  `teammate_ready` handshake, mail/task/shutdown, full events.jsonl audit trail.
+- Full suite: **216 passed**, ruff clean. Plan for next phase: `docs/s11-multi-cli-plan.md`.
 
 ## S7 plan review @ 2026-06-10
 
@@ -224,3 +227,5 @@ passed, ruff clean.
 | S8 | done |
 | S9 | done (manual smoke passed 2026-06-14) |
 | S10 | done (manual E2E passed 2026-06-15) |
+| S11 | planned — multi-CLI (codex 2nd lead) + $20-lead token/observability hardening (D6/D8/D9/D10/D11/D12); see `docs/s11-multi-cli-plan.md` |
+| S12 | planned — Gemini/Antigravity teammate→lead, gated on G0–G6 on-machine verification |
