@@ -158,6 +158,22 @@ def test_recorded_calls_empty_when_not_mock() -> None:
         assert backend.recorded_calls == []
 
 
+def test_capture_pane_mock_records_argv_and_returns_empty() -> None:
+    backend = PsmuxBackend(mock=True)
+    out = backend.capture_pane("%3")
+    assert out == ""
+    call = next(c for c in backend.recorded_calls if "capture-pane" in c.args)
+    assert call.args == ["capture-pane", "-t", "%3", "-p"]
+
+
+def test_capture_pane_rejects_bad_target() -> None:
+    from agent_team._io import InvalidPathSegmentError
+
+    backend = PsmuxBackend(mock=True)
+    with pytest.raises(InvalidPathSegmentError):
+        backend.capture_pane("%bad!")
+
+
 @pytest.mark.integration
 @pytest.mark.skipif(shutil.which("psmux") is None, reason="psmux not installed")
 def test_real_new_session_and_list() -> None:

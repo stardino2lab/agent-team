@@ -184,6 +184,16 @@ class PsmuxBackend:
         pane_ids = self._parse_pane_ids(output)
         return [PaneInfo(pane_id=p) for p in pane_ids]
 
+    def capture_pane(self, target: str) -> str:
+        """Return the current pane buffer text (`capture-pane -p`).
+
+        Used by the runner's input-readiness wait (D11). In mock mode there is no
+        real pane, so this returns "" — callers must treat empty as "not ready
+        yet" and fall back to a timeout, which the mock path exercises.
+        """
+        safe_target = self._validate_target(target)
+        return self._run(["capture-pane", "-t", safe_target, "-p"])
+
     def _validate_session_name(self, name: str) -> str:
         return safe_segment(name, "psmux_session")
 
