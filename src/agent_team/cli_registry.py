@@ -28,6 +28,11 @@ class CliSpec:
     supports_lead: bool
     supports_teammate: bool
     mcp_config_filename: str | None
+    # Per-CLI args the RUNNER appends to a teammate's bare launch command (read
+    # from here, never from the lead — preserves lead/teammate CLI decoupling).
+    # codex: run non-interactively (no per-command approval, no sandbox, no trust
+    # prompt) so a teammate pane works hands-off. claude: none (bare launch).
+    teammate_launch_args: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.supports_lead and not self.mcp_config_filename:
@@ -50,6 +55,7 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_lead=False,
         supports_teammate=True,
         mcp_config_filename=None,
+        teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
     ),
     # antigravity: S11 — added together with persona YAML + lead launch builder.
 }

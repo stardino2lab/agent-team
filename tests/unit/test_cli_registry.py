@@ -89,3 +89,19 @@ def test_lead_cli_not_supported_error_is_value_error() -> None:
     """Callers should be able to catch ValueError; we keep the hierarchy flat."""
     assert issubclass(LeadCliNotSupportedError, ValueError)
     assert issubclass(UnknownCliError, ValueError)
+
+
+def test_codex_teammate_launch_args_bypass() -> None:
+    from agent_team.cli_registry import get_cli_spec
+
+    codex = get_cli_spec("codex")
+    # D12: codex teammate runs hands-off (no per-command approval / sandbox /
+    # trust prompts) — applied by the runner, never named by the lead.
+    assert codex.teammate_launch_args == ("--dangerously-bypass-approvals-and-sandbox",)
+
+
+def test_claude_teammate_launch_args_empty() -> None:
+    from agent_team.cli_registry import get_cli_spec
+
+    # claude teammate launches bare (CLI-neutral invariant; no per-CLI flags).
+    assert get_cli_spec("claude").teammate_launch_args == ()
