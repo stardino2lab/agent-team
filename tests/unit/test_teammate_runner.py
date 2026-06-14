@@ -8,7 +8,7 @@ import pytest
 
 from agent_team.personas import PersonaNotFoundError, PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
-from agent_team.teammate_runner import TeammateRunner
+from agent_team.teammate_runner import TeammateRunner, _kickoff_line
 
 
 @pytest.fixture
@@ -81,8 +81,10 @@ def test_spawn_splits_pane_and_sends_persona_prompt(
     assert "\n" not in keys_arg
     assert "\r" not in keys_arg
     assert "helper-1" in keys_arg
-    # Points the teammate at its on-disk brief by absolute path.
-    brief = session_dir / "teammates" / "helper-1" / "AGENTS.md"
+    # Points the teammate at its on-disk brief by ABSOLUTE path (the teammate
+    # runs from the project cwd, so a relative path would not be locatable).
+    brief = (session_dir / "teammates" / "helper-1" / "AGENTS.md").resolve()
+    assert brief.is_absolute()
     assert str(brief) in keys_arg
     # The role/task text lives in the brief file, not in the kickoff line.
     assert "You are the Planner teammate" not in keys_arg
@@ -116,6 +118,9 @@ def test_spawn_renders_agents_md_per_teammate(
     assert "planner" in body
     assert "demo" in body  # session_id
     assert "Plan login flow." in body
+    # The multi-line persona role template lives in the brief (not the kickoff),
+    # so a block-scalar template can never reach send_keys as multi-line.
+    assert "You are the Planner teammate" in body
 
 
 def test_spawn_mock_uses_safe_command_skips_send_keys_and_no_agents_md(
@@ -180,6 +185,22 @@ def test_spawn_passes_persona_cli_to_split_pane(
     assert expected_cli in split.args, (
         f"expected literal {expected_cli!r} in split-window args, got {split.args!r}"
     )
+
+
+def test_kickoff_line_is_single_line_with_brief_path() -> None:
+    brief = Path("C:/Users/x/.agent-team/sessions/s/teammates/helper-1/AGENTS.md")
+    line = _kickoff_line("helper-1", brief)
+    assert "\n" not in line
+    assert "\r" not in line
+    assert "helper-1" in line
+    assert str(brief) in line
+
+
+def test_kickoff_line_collapses_newlines_from_inputs() -> None:
+    """Defensive: even a name carrying newlines yields a single-line kickoff."""
+    line = _kickoff_line("a\nb\rc", Path("/tmp/brief.md"))
+    assert "\n" not in line
+    assert "\r" not in line
 
 
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:

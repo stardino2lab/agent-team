@@ -131,9 +131,26 @@ teammate_ready`. The smoke + a high-effort code review surfaced and fixed real b
 
 - ✅ ~~Lead pane bootstrap~~ — S9 code-complete 에서 처리. CLI registry seam PR이 enum 추상화까지 마무리.
 - **teammate_ready handshake**: currently emitted right after `send_keys`. S10+ should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
-- **Teammate prompt newlines (review #5)**: `TeammateRunner` send_keys's a multi-line `full_prompt`; embedded `\n` submit lines prematurely in the teammate pane. Fix when real teammate prompt delivery lands (S10) — send line-by-line, or rely on AGENTS.md (already carries the full text) and send a short kickoff line.
-- **Teammate cwd (review #7)**: teammate pane runs from `{session_dir}/teammates/{name}` (scratch dir outside the project repo) so the CLI auto-reads AGENTS.md. Real implementers need the project checkout as cwd to edit files / run git — revisit when teammates do real work (S10).
+- ✅ ~~Teammate prompt newlines (review #5)~~ — fixed in S10a: single-line kickoff via `_kickoff_line`; full role/task context lives in the brief file.
+- ✅ ~~Teammate cwd (review #7)~~ — fixed in S10a: teammate pane cwd is the project root; brief stays in the session scratch dir (no pollution).
 - **EventLog tail-by-type API**: `Orchestrator.reconcile_handled` reads the full events.jsonl each attach. Bound it once long-running sessions exist.
+
+## S10a — teammate work foundation (2026-06-14)
+
+CLI-neutral fix so a spawned teammate does real work. `TeammateRunner.spawn` now
+sets the pane cwd to the project root (#7) and triggers via a single-line "read
+your brief" kickoff (#5); launch stays bare `command=persona.cli` (heterogeneous-
+team invariant intact). Brief stays in the session scratch dir — no project
+pollution. Spec/plan: `docs/superpowers/specs/2026-06-14-s10a-*-design.md`,
+`docs/superpowers/plans/2026-06-14-s10a-*.md`.
+
+5-expert code-review gate: 1 BLOCKING fixed (resolve brief path to absolute so a
+relative `AGENT_TEAM_HOME` can't hide the brief from the project-cwd teammate) +
+test hardening (direct `_kickoff_line` tests, brief-content lock). 208 passed,
+ruff clean.
+
+Remaining S10 slices: S10b real `teammate_ready` handshake; S10c payment-api
+fixture + codex teammate (same CLI-neutral launch); S10d manual E2E.
 
 ## Blockers
 
@@ -156,4 +173,4 @@ teammate_ready`. The smoke + a high-effort code review surfaced and fixed real b
 | S7 | done |
 | S8 | done |
 | S9 | done (manual smoke passed 2026-06-14) |
-| S10 | pending |
+| S10 | in progress (S10a done 2026-06-14) |

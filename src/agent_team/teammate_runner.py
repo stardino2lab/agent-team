@@ -55,9 +55,11 @@ class TeammateRunner:
     exits cleanly and no real LLM is launched. Whether psmux itself is real
     or mocked is the caller's choice via PsmuxBackend.
 
-    Real mode (mock=False) also renders AGENTS.md per teammate into
-    {session_dir}/teammates/{teammate_name}/AGENTS.md and runs the teammate
-    CLI from that directory so it auto-picks the file up.
+    Real mode (mock=False) renders a brief to
+    {session_dir}/teammates/{teammate_name}/AGENTS.md (the session scratch dir,
+    never the project), runs the teammate CLI from the PROJECT root so it can
+    edit files / run pytest / git, and triggers it with a single-line kickoff
+    that points at the brief's absolute path.
     """
 
     def __init__(
@@ -111,8 +113,11 @@ class TeammateRunner:
             pane_id = self.psmux.split_pane(
                 psmux_session, command=p.cli, cwd=project_path
             )
+            # Resolve to an absolute path: the teammate runs from the project
+            # cwd, so a relative brief path (possible when AGENT_TEAM_HOME is
+            # relative) would not be locatable.
             self.psmux.send_keys(
-                pane_id, _kickoff_line(teammate_name, brief_path), enter=True
+                pane_id, _kickoff_line(teammate_name, brief_path.resolve()), enter=True
             )
 
         self.recorded_spawns.append(
