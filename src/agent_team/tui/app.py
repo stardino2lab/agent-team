@@ -135,6 +135,6 @@ def refresh_all_panels(app: AgentTeamApp) -> None:
     )
     app.mail.refresh_panel(ctx.session_dir)
     app.tasks.refresh_panel(ctx.session_dir)
-    app.team.refresh_panel(ctx)
+    app.team.refresh_panel(ctx, session=session)
     app.log_panel.refresh_panel(ctx.session_dir)
     app.check_spawn_modal()

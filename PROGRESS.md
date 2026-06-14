@@ -107,16 +107,32 @@
 - 테스트 신규/보강: `test_cli_registry.py` 11건 (parametrize invariant + lookup + post_init), `test_orchestrator.py` substring 분해 검증 + lead unsupported parametrize 3 케이스 (codex/antigravity/xyz) + cleanup, `test_personas.py` / `test_spawn_approval.py` antigravity/xyz reject 메시지 호환, `test_teammate_runner.py` parametrize `(claude, codex)`.
 - 문서: `tests/manual/s9-claude-lead.md:80` `NotImplementedError` → `LeadCliNotSupportedError`. `IMPLEMENTATION.md` §Schemas members.cli registry 주석 + bundled mirror 동기화 정책 한 줄. `s9-api-sketch.md` D11 cell + 테스트 슬롯 #7 갱신.
 
+## S9 manual smoke + code review (2026-06-14)
+
+Ran `tests/manual/s9-claude-lead.md` against psmux (tmux 3.3.5 Win port) + claude
+2.1.175. Core flow verified end-to-end: lead claude launched with `--strict-mcp-config`
+isolation, `list_personas`/`spawn_teammate` over MCP, TUI approval, teammate pane +
+rendered AGENTS.md, audit trail `session_started → spawn_requested → spawn_approved →
+teammate_ready`. The smoke + a high-effort code review surfaced and fixed real bugs:
+
+- send_keys typed a literal "Enter" (`-l <keys> Enter`) → lead launch never executed → Enter is now a separate send-keys call.
+- bare `claude` mis-resolved to a non-existent `claude.exe` in the pwsh lead pane → resolve via `shutil.which` (full `.CMD` path). Lead stays `new_session` shell + send_keys: the pane anchors the session, and a direct `command=` launch kills the session when claude exits (verified empirically).
+- TUI header teammate count frozen at `on_mount` (0/3) → recomputed in `refresh_all_panels`.
+- `start` leaked `LeadCliNotSupportedError`/`SessionExistsError` as raw tracebacks → caught → clean message.
+- `write_json` non-atomic → TUI refresh could read a half-written `session.json` → temp + `os.replace`.
+- MCP config used bare `"python"` → `sys.executable`; filename now from `cli_registry.mcp_config_filename`; team panel no longer double-loads the session per refresh.
+
 ## Next action
 
-1. **S9 manual smoke** — `tests/manual/s9-claude-lead.md` 정정판 사용. psmux + claude 2.1.175 로 한 사이클.
-2. 결과 pass 면 S9 done → S10 (payment-api E2E) 진입.
-3. S11 PR — codex/antigravity 실제 lead launch builder + persona YAML + registry entry 추가.
+1. S9 done (manual smoke passed with fixes) → S10 (payment-api E2E) 진입.
+2. S11 PR — codex/antigravity 실제 lead launch builder + persona YAML + registry entry 추가.
 
 ### Carried into S9+ from earlier reviews
 
 - ✅ ~~Lead pane bootstrap~~ — S9 code-complete 에서 처리. CLI registry seam PR이 enum 추상화까지 마무리.
 - **teammate_ready handshake**: currently emitted right after `send_keys`. S10+ should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
+- **Teammate prompt newlines (review #5)**: `TeammateRunner` send_keys's a multi-line `full_prompt`; embedded `\n` submit lines prematurely in the teammate pane. Fix when real teammate prompt delivery lands (S10) — send line-by-line, or rely on AGENTS.md (already carries the full text) and send a short kickoff line.
+- **Teammate cwd (review #7)**: teammate pane runs from `{session_dir}/teammates/{name}` (scratch dir outside the project repo) so the CLI auto-reads AGENTS.md. Real implementers need the project checkout as cwd to edit files / run git — revisit when teammates do real work (S10).
 - **EventLog tail-by-type API**: `Orchestrator.reconcile_handled` reads the full events.jsonl each attach. Bound it once long-running sessions exist.
 
 ## Blockers
@@ -139,5 +155,5 @@
 | S6 | done |
 | S7 | done |
 | S8 | done |
-| S9 | code-complete (manual pending) |
+| S9 | done (manual smoke passed 2026-06-14) |
 | S10 | pending |

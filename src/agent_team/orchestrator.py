@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agent_team._watcher import FileWatcher
-from agent_team.cli_registry import LeadCliNotSupportedError, is_lead_supported
+from agent_team.cli_registry import (
+    LeadCliNotSupportedError,
+    get_cli_spec,
+    is_lead_supported,
+)
 from agent_team.event_log import EventLog
 from agent_team.project_loader import ProjectLoader
 from agent_team.psmux_backend import PsmuxBackend
@@ -32,19 +36,27 @@ def _check_lead_cli_supported(cli: str) -> None:
         )
 
 
-def _write_lead_mcp_config(session_dir: Path, session_id: str, project_path: Path) -> Path:
-    """Render the lead's MCP config JSON to {session_dir}/claude-mcp.json.
+def _write_lead_mcp_config(
+    session_dir: Path, session_id: str, project_path: Path, *, cli: str
+) -> Path:
+    """Render the lead's MCP config JSON to {session_dir}/<registry filename>.
 
     Uses json.dumps (not Jinja) so Windows backslashes do not need manual
     escaping inside the template. AGENT_TEAM_HOME is captured from
     default_base_dir() at write time — env var changes after this function
     returns do not flow into the file. A fresh `agent-team start` would
     re-render with the new value.
+
+    The MCP server runs under ``sys.executable`` (the interpreter that has
+    agent_team installed) instead of a bare ``python`` that may resolve to a
+    different/absent interpreter in the lead pane's environment. The output
+    filename comes from the cli registry so it stays correct as S11+ adds
+    other lead CLIs.
     """
     config = {
         "mcpServers": {
             "agent-team": {
-                "command": "python",
+                "command": sys.executable,
                 "args": ["-m", "agent_team.mcp_server"],
                 "env": {
                     "AGENT_TEAM_HOME": str(default_base_dir()),
@@ -54,7 +66,9 @@ def _write_lead_mcp_config(session_dir: Path, session_id: str, project_path: Pat
             }
         }
     }
-    path = session_dir / "claude-mcp.json"
+    filename = get_cli_spec(cli).mcp_config_filename
+    assert filename is not None  # lead-capable CLIs always declare one (CliSpec)
+    path = session_dir / filename
     path.write_text(json.dumps(config, indent=2), encoding="utf-8")
     return path
 
@@ -187,7 +201,7 @@ class Orchestrator:
             members_started: list[str] = ["lead"]
             if not self.ctx.no_psmux:
                 mcp_config_path = _write_lead_mcp_config(
-                    self.ctx.session_dir, self.ctx.session_id, project_path
+                    self.ctx.session_dir, self.ctx.session_id, project_path, cli=lead_cli
                 )
                 lead_context = loader.build_lead_context(
                     playbook_name=playbook, extra_context=context_text

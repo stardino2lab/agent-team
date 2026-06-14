@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -381,7 +382,9 @@ def test_start_renders_mcp_config_into_session_dir(
     assert mcp_path.exists()
     data = json.loads(mcp_path.read_text(encoding="utf-8"))
     server = data["mcpServers"]["agent-team"]
-    assert server["command"] == "python"
+    # Launched under the orchestrator's own interpreter (the one with
+    # agent_team installed), not a bare "python" that may differ in the pane.
+    assert server["command"] == sys.executable
     assert server["args"] == ["-m", "agent_team.mcp_server"]
     env = server["env"]
     assert env["AGENT_TEAM_SESSION_ID"] == "s9-mcp"
