@@ -13,6 +13,7 @@ from agent_team.cli.mail import mail_group
 from agent_team.cli.personas_cmd import personas_group
 from agent_team.cli.start import start_cmd
 from agent_team.cli.task import task_group
+from agent_team.cli.teammate import teammate_group
 from agent_team.cli.tui_cmd import tui_cmd
 
 
@@ -30,6 +31,7 @@ main.add_command(task_group)
 main.add_command(logs_group)
 main.add_command(personas_group)
 main.add_command(context_group)
+main.add_command(teammate_group)
 main.add_command(tui_cmd)
 
 

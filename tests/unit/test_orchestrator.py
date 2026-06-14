@@ -109,10 +109,12 @@ def test_run_once_spawns_for_approved(
     assert len(orchestrator.ctx.runner.recorded_spawns) == 1
 
 
-def test_run_once_emits_teammate_ready(
+def test_teammate_ready_emitted_only_after_ready_marker(
     orchestrator: Orchestrator,
     event_log: EventLog,
 ) -> None:
+    """S10b handshake: run_once spawns 'starting'; teammate_ready waits for the
+    ready marker, then poll_ready emits it (idempotently)."""
     _request_and_approve(
         approval=orchestrator.ctx.approval,
         session_dir=orchestrator.ctx.session_dir,
@@ -120,7 +122,26 @@ def test_run_once_emits_teammate_ready(
         persona="planner",
     )
     orchestrator.run_once()
-    events = [e for e in event_log.read(orchestrator.ctx.session_dir) if e.type == "teammate_ready"]
+
+    # Not ready yet: no teammate_ready, member is "starting".
+    assert [
+        e for e in event_log.read(orchestrator.ctx.session_dir)
+        if e.type == "teammate_ready"
+    ] == []
+    session = orchestrator.ctx.store.load(orchestrator.ctx.session_id)
+    teammate = next(m for m in session.members if m.role == "teammate")
+    assert teammate.status == "starting"
+
+    # Teammate signals ready (writes the marker) -> poll_ready emits the event.
+    marker = orchestrator.ctx.session_dir / "teammates" / teammate.name / "ready"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("{}", encoding="utf-8")
+    orchestrator.poll_ready()
+
+    events = [
+        e for e in event_log.read(orchestrator.ctx.session_dir)
+        if e.type == "teammate_ready"
+    ]
     assert len(events) == 1
     p = events[0].payload
     assert p["persona"] == "planner"
@@ -129,8 +150,17 @@ def test_run_once_emits_teammate_ready(
     assert p["cli"] == "claude"
     assert p["request_id"].startswith("apr-")
 
+    # Member flipped to running, and a second poll does not re-emit.
+    session = orchestrator.ctx.store.load(orchestrator.ctx.session_id)
+    assert next(m for m in session.members if m.role == "teammate").status == "running"
+    orchestrator.poll_ready()
+    assert len([
+        e for e in event_log.read(orchestrator.ctx.session_dir)
+        if e.type == "teammate_ready"
+    ]) == 1
 
-def test_run_once_updates_member_status(
+
+def test_run_once_sets_member_starting_with_request_id(
     orchestrator: Orchestrator,
     event_log: EventLog,
 ) -> None:
@@ -144,7 +174,8 @@ def test_run_once_updates_member_status(
     teammates = [m for m in session.members if m.role == "teammate"]
     assert len(teammates) == 1
     t = teammates[0]
-    assert t.status == "running"
+    assert t.status == "starting"
+    assert t.request_id is not None and t.request_id.startswith("apr-")
     assert t.pane_id is not None
     assert t.persona == "planner"
     assert t.name == "helper-1"

@@ -7,6 +7,15 @@ Project: `{{ project_path }}`
 
 {{ spawn_prompt }}
 
+## When you are ready
+
+Run this once, after reading this brief and before starting work, to signal the
+orchestrator that you are ready:
+
+```powershell
+agent-team teammate ready --session {{ session_id }} --as {{ teammate_name }}
+```
+
 ## Coordination (required)
 
 Use these CLI commands from the project directory:

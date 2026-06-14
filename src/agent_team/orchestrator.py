@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -144,9 +145,14 @@ class Orchestrator:
         self.ctx = ctx
         self._handled_request_ids: set[str] = set()
         self._watcher: FileWatcher | None = None
+        self._ready_watcher: FileWatcher | None = None
+        # Serializes member mutations across the approval watcher thread
+        # (run_once) and the teammates watcher thread (poll_ready). Reentrant so
+        # run_once can call poll_ready while holding it.
+        self._lock = threading.RLock()
 
     def start_watching(self) -> None:
-        """Start a FileWatcher on approval/ that calls run_once on change."""
+        """Watch approval/ (run_once) and teammates/ (poll_ready) for changes."""
         if self._watcher is not None:
             return
         approval_dir = self.ctx.session_dir / "approval"
@@ -158,10 +164,23 @@ class Orchestrator:
         )
         self._watcher.start()
 
+        teammates_dir = self.ctx.session_dir / "teammates"
+        teammates_dir.mkdir(parents=True, exist_ok=True)
+        self._ready_watcher = FileWatcher(
+            teammates_dir,
+            self.poll_ready,
+            recursive=True,
+            label="ReadyWatcher",
+        )
+        self._ready_watcher.start()
+
     def stop_watching(self) -> None:
         if self._watcher is not None:
             self._watcher.stop()
             self._watcher = None
+        if self._ready_watcher is not None:
+            self._ready_watcher.stop()
+            self._ready_watcher = None
 
     def start(
         self,
@@ -280,9 +299,13 @@ class Orchestrator:
         A resolution is treated as handled if any of the following hold:
         - decision is "denied"
         - an emitted teammate_ready or error event carries its request_id
+        - a session member records its request_id (spawned, even if still
+          "starting" — the S10b handshake defers teammate_ready, so the member
+          is the authoritative "already spawned" signal)
         - its teammate_name already appears in session.members
-        The event-log channel is the strongest signal, because teammate_name
-        is often None when the request did not pre-assign one.
+        The member request_id channel is the strongest signal, because
+        teammate_name is often None when the request did not pre-assign one and
+        teammate_ready may not have fired yet.
         """
         ready_request_ids: set[str] = set()
         for event in self.ctx.event_log.read(self.ctx.session_dir):
@@ -293,27 +316,35 @@ class Orchestrator:
 
         session = self.ctx.store.load(self.ctx.session_id)
         teammate_names = {m.name for m in session.members if m.role == "teammate"}
+        member_request_ids = {
+            m.request_id for m in session.members if m.request_id is not None
+        }
 
         for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
             if res.decision == "denied":
                 self._handled_request_ids.add(res.request_id)
             elif res.request_id in ready_request_ids:
                 self._handled_request_ids.add(res.request_id)
+            elif res.request_id in member_request_ids:
+                self._handled_request_ids.add(res.request_id)
             elif res.teammate_name and res.teammate_name in teammate_names:
                 self._handled_request_ids.add(res.request_id)
 
     def run_once(self) -> int:
-        spawned = 0
-        for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
-            if res.request_id in self._handled_request_ids:
-                continue
-            if res.decision != "approved":
+        with self._lock:
+            spawned = 0
+            for res in self.ctx.approval.read_resolutions(self.ctx.session_dir):
+                if res.request_id in self._handled_request_ids:
+                    continue
+                if res.decision != "approved":
+                    self._handled_request_ids.add(res.request_id)
+                    continue
+                if self._spawn_one(res):
+                    spawned += 1
                 self._handled_request_ids.add(res.request_id)
-                continue
-            if self._spawn_one(res):
-                spawned += 1
-            self._handled_request_ids.add(res.request_id)
-        return spawned
+            # Reconcile any ready markers written while detached / between ticks.
+            self.poll_ready()
+            return spawned
 
     def _spawn_one(self, res: SpawnResolution) -> bool:
         if res.persona is None or res.cli is None:
@@ -363,6 +394,8 @@ class Orchestrator:
             )
             pane_id = result.pane_id
 
+        # status="starting": the teammate is not ready until it writes its ready
+        # marker (S10b). poll_ready flips it to "running" and emits teammate_ready.
         members = list(session.members) + [
             Member(
                 name=teammate_name,
@@ -371,22 +404,44 @@ class Orchestrator:
                 cli=cli,
                 pane_id=pane_id,
                 backend="psmux",
-                status="running",
+                status="starting",
+                request_id=res.request_id,
             )
         ]
         self.ctx.store.update_members(session.session_id, members)
-        self.ctx.event_log.append(
-            self.ctx.session_dir,
-            type_="teammate_ready",
-            payload={
-                "request_id": res.request_id,
-                "persona": persona,
-                "name": teammate_name,
-                "pane_id": pane_id,
-                "cli": cli,
-            },
-        )
         return True
+
+    def poll_ready(self) -> None:
+        """Emit teammate_ready for any 'starting' teammate whose marker exists.
+
+        Driven by the teammates-dir watcher and by run_once/attach so a marker
+        written while detached is reconciled. Idempotent: a member already
+        'running' is skipped, so a second watcher tick never re-emits.
+        """
+        with self._lock:
+            session = self.ctx.store.load(self.ctx.session_id)
+            updated = False
+            for m in session.members:
+                if m.role != "teammate" or m.status != "starting":
+                    continue
+                marker = self.ctx.session_dir / "teammates" / m.name / "ready"
+                if not marker.exists():
+                    continue
+                m.status = "running"
+                updated = True
+                self.ctx.event_log.append(
+                    self.ctx.session_dir,
+                    type_="teammate_ready",
+                    payload={
+                        "request_id": m.request_id,
+                        "persona": m.persona,
+                        "name": m.name,
+                        "pane_id": m.pane_id,
+                        "cli": m.cli,
+                    },
+                )
+            if updated:
+                self.ctx.store.update_members(self.ctx.session_id, session.members)
 
     def _next_teammate_name(self, session: Session) -> str:
         existing = {m.name for m in session.members if m.role == "teammate"}

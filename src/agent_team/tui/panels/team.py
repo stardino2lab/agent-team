@@ -27,5 +27,7 @@ class TeamPanel(Vertical):
         for row in rows:
             pane = row.pane_id or "—"
             persona = row.persona or "—"
-            lines.append(f"{row.name} ({row.role}, {row.cli}, {persona}) pane {pane}")
+            lines.append(
+                f"{row.name} ({row.role}, {row.cli}, {persona}) pane {pane} [{row.status}]"
+            )
         self.query_one("#team-body", Static).update("\n".join(lines) if lines else "(empty)")

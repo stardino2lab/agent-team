@@ -292,5 +292,7 @@ def test_attach_cli_resumes_and_drains_pending_resolutions(
     session = session_store.load(sid)
     teammates = [m for m in session.members if m.role == "teammate"]
     assert len(teammates) == 1, [m.name for m in session.members]
-    events = EventLog().read(session_dir)
-    assert any(e.type == "teammate_ready" for e in events)
+    # S10b: attach drains + spawns the teammate as "starting"; teammate_ready is
+    # deferred until the teammate writes its ready marker (none in this dry-run).
+    assert teammates[0].status == "starting"
+    assert teammates[0].request_id is not None

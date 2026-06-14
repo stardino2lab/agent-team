@@ -32,6 +32,10 @@ class Member:
     pane_id: str | None
     backend: str
     status: str
+    # Originating spawn request id, set for teammates so the orchestrator can
+    # emit teammate_ready with the right request_id after a detach/attach
+    # restart (S10b handshake). None for the lead and pre-S10b sessions.
+    request_id: str | None = None
 
 
 @dataclass
@@ -63,6 +67,7 @@ def _member_to_dict(member: Member) -> dict:
         "pane_id": member.pane_id,
         "backend": member.backend,
         "status": member.status,
+        "request_id": member.request_id,
     }
 
 
@@ -75,6 +80,7 @@ def _member_from_dict(data: dict) -> Member:
         pane_id=data.get("pane_id"),
         backend=data["backend"],
         status=data["status"],
+        request_id=data.get("request_id"),
     )
 
 

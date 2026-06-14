@@ -64,6 +64,43 @@ def test_load_round_trip_members(session_store: SessionStore) -> None:
     assert loaded.members[1].pane_id == "%2"
 
 
+def test_member_round_trips_request_id_and_defaults_none(
+    session_store: SessionStore,
+) -> None:
+    """S10b: Member.request_id persists; a member without it loads as None."""
+    session_store.create(
+        session_id="rid",
+        project_path="c:\\DEV\\test",
+        psmux_session="rid",
+        members=[
+            Member(
+                name="lead",
+                role="lead",
+                persona=None,
+                cli="claude",
+                pane_id="%0",
+                backend="psmux",
+                status="running",
+            ),
+            Member(
+                name="helper-1",
+                role="teammate",
+                persona="planner",
+                cli="claude",
+                pane_id="%1",
+                backend="psmux",
+                status="starting",
+                request_id="apr-007",
+            ),
+        ],
+    )
+    loaded = session_store.load("rid")
+    lead, teammate = loaded.members
+    assert lead.request_id is None
+    assert teammate.request_id == "apr-007"
+    assert teammate.status == "starting"
+
+
 def test_create_duplicate_raises(session_store: SessionStore) -> None:
     session_store.create(
         session_id="dup",
