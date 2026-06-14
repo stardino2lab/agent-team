@@ -635,3 +635,21 @@ def test_reconcile_handled_skips_existing_teammates(
     fresh = Orchestrator(orchestrator.ctx)
     fresh.reconcile_handled()
     assert fresh.run_once() == 0
+
+
+def test_reconcile_handled_tails_event_read(orchestrator, monkeypatch) -> None:
+    import agent_team.orchestrator as orchestrator_module
+
+    captured: dict = {}
+    real_read = orchestrator.ctx.event_log.read
+
+    def spy_read(session_dir, since=None, limit=None):
+        captured["limit"] = limit
+        return real_read(session_dir, since=since, limit=limit)
+
+    monkeypatch.setattr(orchestrator.ctx.event_log, "read", spy_read)
+    orchestrator.reconcile_handled()
+
+    # D9: reconcile bounds its events.jsonl ingest with the generous tail constant.
+    assert captured["limit"] == orchestrator_module._RECONCILE_EVENT_TAIL
+    assert orchestrator_module._RECONCILE_EVENT_TAIL >= 2000

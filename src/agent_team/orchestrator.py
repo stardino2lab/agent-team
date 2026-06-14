@@ -22,6 +22,14 @@ from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
 
+# Tail bound for reconcile_handled's events.jsonl ingest on attach (D9). Generous
+# on purpose: correctness rests on session.json, not the log. The handled-signals
+# `member.request_id` and `teammate_name` are read from the COMPLETE session, so a
+# teammate_ready/error event aging past this many entries can at worst cause one
+# redundant `error` re-log on attach — never a double-spawn (a spawned teammate
+# persists as a member). 2000 events ≫ any realistic single session.
+_RECONCILE_EVENT_TAIL = 2000
+
 
 def _check_lead_cli_supported(cli: str) -> None:
     """Raise early if config asks for a lead CLI the registry cannot launch.
@@ -313,7 +321,9 @@ class Orchestrator:
         teammate_ready may not have fired yet.
         """
         ready_request_ids: set[str] = set()
-        for event in self.ctx.event_log.read(self.ctx.session_dir):
+        for event in self.ctx.event_log.read(
+            self.ctx.session_dir, limit=_RECONCILE_EVENT_TAIL
+        ):
             if event.type in ("teammate_ready", "error"):
                 req_id = event.payload.get("request_id")
                 if isinstance(req_id, str):
