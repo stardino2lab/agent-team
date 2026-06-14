@@ -1,4 +1,7 @@
-# S11 Plan — Multi-CLI lead/teammate (cost-aware role allocation)
+# S11/S12 Plan — Multi-CLI lead/teammate (cost-aware role allocation)
+
+> Spans **S11** (claude lead + codex 2nd lead, $20-lead + observability hardening)
+> and **S12** (Gemini/Antigravity, committed — gated behind on-machine verification).
 
 Plan doc for the post-S10 question: *can other AIs (Codex, Gemini/Antigravity) be used as
 lead or teammate, and is MCP usage possible?* Verified by running the real binaries on this
@@ -158,7 +161,7 @@ identity is irrelevant to all three.
 | D2 | MCP config renderer | Split the single hardcoded JSON renderer (`_write_lead_mcp_config`, JSON `claude-mcp.json`) into a format-dispatched renderer. Add a `mcp_format` field to `CliSpec` (`"json"` for claude, `"toml"` for codex). `mcp_config_filename` already exists on `CliSpec`. |
 | D3 | Codex as 2nd verified lead | `cli_registry`: set `codex` `supports_lead=True`, `mcp_config_filename="codex-mcp.toml"` (or inline `-c`), `mcp_format="toml"`. Launch via `codex exec` + `--ignore-user-config` (global-MCP isolation, the `--strict-mcp-config` equivalent) + the agent-team server injected. System prompt via the PROMPT arg + the lead's AGENTS.md (codex has no `--append-system-prompt-file`). |
 | D4 | Config-driven role assignment | Lead via `config.yaml: lead_cli`; teammate-to-CLI via per-persona YAML `cli:` field. Code only knows *capabilities* (registry flags); config decides *assignment*. Switching lead = one-line `lead_cli` flip → cheap A/B / reversibility. |
-| D5 | Gemini/Antigravity | **Stay UNREGISTERED** in `cli_registry` until all verification gates pass (a registry entry without a launch builder is a dead spawn path). Use as a *teammate* first (low bar, captures most savings); promote to lead only if/when gates pass — then it is a config + renderer drop-in, no rebuild. |
+| D5 | Gemini/Antigravity — **committed as S12** | **Stay UNREGISTERED** in `cli_registry` until its verification gates pass (a registry entry without a launch builder is a dead spawn path) — but scheduled as the **S12 milestone**, not an open-ended defer. S12a registers it as a *teammate* (after G0/G1 + its D12-analog approval flags); S12b promotes to lead (after all G0–G6) as a config + renderer drop-in, no rebuild. The G0–G6 spike can run in parallel during S11. See the *S12* section. |
 | D6 | Lead orchestration-only preamble | Add a base lead system-prompt preamble (currently absent — `build_lead_context` has no role framing) that says: *orchestrate only; delegate all file reads/edits/tests to teammates; never review or write code directly; keep context lean*. This locks the low-token property **structurally**, not by playbook convention. |
 | D7 | No nested leads | Single-lead + flat-teammate model is retained. B1/B2 explicitly rejected. |
 | D8 | Event-driven lead wait (no polling) | The lead must NOT poll with shell loops. Add a `wait_for_event(types, since, timeout)` / `get_recent_events(since, limit)` MCP tool backed by `events.jsonl` (the orchestrator already writes `teammate_ready`/`task_completed`/`mail_sent` there via watchfiles). The lead calls it once when expecting a stage to finish instead of arming a Bash watcher. D6 preamble gains a line forbidding shell-loop polling. **Single biggest lead-token saver (5–10k/session).** |
@@ -245,7 +248,45 @@ Run this as a parallel spike, **off the S10/S11 critical path**.
 - **S11a — $20-lead hardening (do first; highest ROI, no new CLI):** **D6** (orchestration-only preamble) + **D8** (event-driven wait, kill polling) + **D9** (bounded/filtered reads). These make the cost-aware premise real and are the direct payoff of the S10 token review. Pure Claude-lead; no multi-CLI risk.
 - **S11b — observability/reliability hardening:** **D10** (teammate transcript capture) + **D11** (kickoff input-readiness — also a standalone task) + **D12** (codex teammate non-interactive approvals/sandbox launch). D11+D12 together make codex/gemini teammates run hands-off; prerequisite for parallel spawning.
 - **S11c — Codex as 2nd lead:** **D1** + **D2** + **D3** + **D4** (config-driven assignment). Proves the seam is real and gives the cost dial (flip `lead_cli`, no code change to revert).
-- **DEFER (parallel spike):** Gemini/Antigravity — **D5**. Teammate-first once G0/G1 pass; lead only after G0–G6.
+- **S12 — Gemini/Antigravity (committed, not an open-ended defer):** **D5**. Prereq: install + the G0–G6 verification spike (can run in PARALLEL during S11, off its critical path). Then **S12a = Gemini teammate** (after G0/G1 — captures most of the cost win), **S12b = Gemini lead** (after all G0–G6 — a config + renderer drop-in). See the *S12* section below.
+
+## S12 — Gemini/Antigravity (committed milestone)
+
+Gemini is the end-goal workhorse — unlimited quota on the heaviest role (coding
+teammates) is the biggest cost win. It is scheduled as its own milestone (not an
+open-ended defer) because it has a real, separable prerequisite: it is **not
+installed yet** and the Windows + headless + (MCP for lead / auto-approve for
+teammate) path is unverified.
+
+**S12-verify (prerequisite spike — can start NOW, parallel to S11, off its critical path):**
+- Install the Gemini/Antigravity CLI on the Windows box; run the **G0–G6** gates
+  (below), reproduced on the machine, not inferred from docs — the same bar codex
+  cleared.
+- Confirm the teammate-relevant pieces specifically: headless launch from a
+  non-interactive pane (G0/G1), a non-interactive/auto-approve mode (**the D12
+  analog for Gemini** — its own approval/sandbox flags), and that the
+  `agent-team` shell helper (mail / task / `teammate ready`) runs under it.
+
+**S12a — Gemini as teammate (ships once G0/G1 + the D12-analog pass):**
+- Register `gemini` in `cli_registry` with `supports_teammate=True` (NOT lead),
+  `teammate_launch_args` = its headless/auto-approve flags (D12 pattern).
+- Add a Gemini persona (e.g. a `gemini` planner/implementer) with `cli: gemini`.
+- **No new launch builder** — teammates go through the CLI-neutral
+  `split_pane(command=persona.cli)` + registry args. Captures the bulk of the
+  savings (heavy role → unlimited tier) at low risk: a teammate failure is
+  locally contained (lead respawns), and Gemini never needs to be an MCP client.
+
+**S12b — Gemini as lead (only after ALL G0–G6 pass):**
+- Flip `supports_lead=True` + `mcp_config_filename`/`mcp_format` + add its lead
+  branch to the D1/D2 dispatch. A config + renderer drop-in; **no rebuild**,
+  because the S11c seam already exists.
+- Lower priority: the lead is the *cheap* role, so a Gemini lead saves little and
+  bets the non-hot-swappable lead seat on the most fragile capability (MCP client
+  on Windows headless). Do only with a concrete reason (e.g. Claude quota
+  genuinely binding the lead).
+
+**Gate:** S12a ships for whatever role passes its gates; S12b only after G0–G6.
+A failed gate does not block S12a — do not force the lead seat.
 
 ## Touch points
 
@@ -303,4 +344,4 @@ kickoff (S10a); the shared brief worked for codex teammates in the S10 E2E.
 - Brain/hands relay orchestration (B1) — rejected.
 - A generic plugin abstraction for a 3rd MCP config format — build only JSON + TOML until a 3rd is verified.
 - Auto-sync of bundled vs repo-root templates (still manual per the IMPLEMENTATION.md policy).
-- Gemini/Antigravity lead support — gated behind G0–G6, not part of S11 delivery.
+- Gemini/Antigravity lead support — delivered in **S12b** (gated behind G0–G6), not S11. (Gemini *teammate* support is S12a, also committed.)
