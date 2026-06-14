@@ -34,6 +34,7 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 ### 4. Goal-Driven Execution
 
 - Define verifiable success criteria before coding.
+- **Plan-first**: before writing/editing code, write a plan document and get approval first. Exceptions: trivial edits, or the user says "just do it". Details: [docs/agents/planning.md](docs/agents/planning.md).
 - Multi-step work: plan with verify checkpoints per step.
 - Run `pytest tests/ -q` before reporting milestone complete.
 
@@ -41,6 +42,7 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 
 | Doc | Read when |
 |-----|-----------|
+| [docs/agents/planning.md](docs/agents/planning.md) | Writing a plan document before implementing |
 | [docs/agents/workflow.md](docs/agents/workflow.md) | Implementing a milestone |
 | [.cursor/skills/review-expert/SKILL.md](.cursor/skills/review-expert/SKILL.md) | Plan or code expert review gate |
 | [docs/agents/git.md](docs/agents/git.md) | Before commit or push |
