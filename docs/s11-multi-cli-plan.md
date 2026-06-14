@@ -79,9 +79,11 @@ Model tier follows the same logic: **Sonnet lead is fine for scoped features
 (routing/triage), reserve Opus for ambiguous-goal decomposition, blocker
 re-planning, and done-ness judgment.**
 
-The same E2E also surfaced two reliability/observability gaps now folded into
-S11 hardening: teammate work has no durable transcript (**D10**), and the
-teammate kickoff `send_keys` fires before the CLI is input-ready (**D11**).
+The same E2E also surfaced reliability/observability gaps now folded into S11
+hardening: teammate work has no durable transcript (**D10**); the teammate
+kickoff `send_keys` fires before the CLI is input-ready (**D11**); and a codex
+teammate, launched bare, blocks on per-command approval prompts and needs a
+non-interactive approval/sandbox launch (**D12**).
 
 ## Core decision — role allocation
 
@@ -136,9 +138,12 @@ Code evidence (today):
 - Actual launch is `psmux.split_pane(command=persona.cli, …)` in `TeammateRunner.spawn` — plain Python,
   independent of which CLI is in the lead pane.
 
-Consequence: the only CLI-specific surface is **lead launch** (D1–D3). The spawn path is already
-CLI-agnostic. **Do not** "optimize" by having the lead exec teammates directly — that would couple
-teammate choice to the lead CLI and destroy the mix-and-match property this plan depends on.
+Consequence: the CLI-specific surfaces are **lead launch** (D1–D3) and, per D12, **registry-driven
+teammate launch args** (codex approval/sandbox flags). Both are read from `cli_registry`/persona by
+the Python runner — the LEAD never sees them. That keeps the invariant intact: the lead still only
+names a persona; `TeammateRunner` applies the per-CLI launch details. **Do not** "optimize" by
+having the lead exec teammates directly or pass CLI flags itself — that would couple teammate choice
+to the lead CLI and destroy the mix-and-match property this plan depends on.
 
 Requirements for a heterogeneous team under a non-Claude lead: (1) the lead CLI can *call* the
 `spawn_teammate` MCP tool — verified for Codex (handshake returned all 9 tools); (2) each teammate CLI is
@@ -159,7 +164,8 @@ identity is irrelevant to all three.
 | D8 | Event-driven lead wait (no polling) | The lead must NOT poll with shell loops. Add a `wait_for_event(types, since, timeout)` / `get_recent_events(since, limit)` MCP tool backed by `events.jsonl` (the orchestrator already writes `teammate_ready`/`task_completed`/`mail_sent` there via watchfiles). The lead calls it once when expecting a stage to finish instead of arming a Bash watcher. D6 preamble gains a line forbidding shell-loop polling. **Single biggest lead-token saver (5–10k/session).** |
 | D9 | Bounded + filtered reads | `read_messages` gains `from_`/`since` filtering (today it returns the full inbox); `EventLog.read` + `reconcile_handled` gain a tail `limit` so a long-running session doesn't re-ingest the whole log. Caps the lead's worst-case context bloat. |
 | D10 | Teammate transcript capture | At spawn, pipe each teammate pane to `{session_dir}/teammates/{name}/transcript.log` via psmux `pipe-pane`. The `events.jsonl` coordination trail + mail summaries do NOT capture a teammate's reasoning/edits; this gives a durable per-teammate work record. `agent-team logs export` bundles transcripts + events. The transcript lives on disk and is **never pulled into the lead's context** (D6), so observability does not cost lead tokens. |
-| D11 | Teammate kickoff input-readiness | The kickoff `send_keys` fires immediately after `split_pane`, before the teammate CLI is ready for input — codex's first-run "trust this folder?" prompt eats the keystrokes, so the kickoff (and its Enter) drop and the teammate sits idle. CLI-neutral fix (retry until the ready-marker appears, or await an input-ready signal). **Prerequisite for parallel/gemini teammates** (same failure would hit them). Tracked as its own task; referenced here because it gates smooth multi-CLI teammate spawning. |
+| D11 | Teammate kickoff input-readiness (**timing**) | The kickoff `send_keys` fires immediately after `split_pane`, before the teammate CLI is ready for input — codex's first-run "trust this folder?" prompt eats the *first* keystrokes, so the kickoff (and its Enter) drop and the teammate sits idle. CLI-neutral fix (retry until the ready-marker appears, or await an input-ready signal). **Prerequisite for parallel/gemini teammates**. Tracked as its own task. *Scope: the one-time kickoff drop only — the per-command approval blocking is D12.* |
+| D12 | Codex teammate non-interactive launch (**approvals/sandbox**) | A bare `split_pane(command="codex")` runs codex interactively and BLOCKS on its **per-command approval prompts** (and the first-run trust prompt) — in the S10 E2E the user had to manually approve each command class ("always run commands that start with `agent-team`…"). Codex needs launch flags for hands-off teammate work: an approval policy + sandbox, e.g. `codex -a <policy> -s workspace-write --skip-git-repo-check`, or `--dangerously-bypass-approvals-and-sandbox` on a trusted box. This requires **per-CLI teammate launch args**, which the S10a bare-`command=persona.cli` design intentionally omitted. Resolve by adding `teammate_launch_args` to `CliSpec` (registry-driven), applied by `TeammateRunner` — NOT by the lead, so the decoupling invariant holds (the lead still only names a persona; the runner reads the registry). Update the S10c "bare codex, no flags" assertion accordingly. A future gemini teammate needs the same (verify its headless/auto-approve mode in the G-gates). |
 
 ## Lead orchestration-only preamble (D6) — exact text
 
@@ -237,7 +243,7 @@ Run this as a parallel spike, **off the S10/S11 critical path**.
 
 - **DONE (S10):** payment-api E2E passed with **Claude lead + Codex/Claude teammates**. The CLI-neutral seam landed across S9/S10a (lead launch via `shutil.which` + CLI-agnostic `split_pane(command=persona.cli)`). D1/D2 (full per-CLI dispatch + format-dispatched renderer) are not yet done — codex-as-lead still needs them.
 - **S11a — $20-lead hardening (do first; highest ROI, no new CLI):** **D6** (orchestration-only preamble) + **D8** (event-driven wait, kill polling) + **D9** (bounded/filtered reads). These make the cost-aware premise real and are the direct payoff of the S10 token review. Pure Claude-lead; no multi-CLI risk.
-- **S11b — observability/reliability hardening:** **D10** (teammate transcript capture) + **D11** (kickoff input-readiness — also a standalone task). D11 gates smooth parallel/gemini teammates.
+- **S11b — observability/reliability hardening:** **D10** (teammate transcript capture) + **D11** (kickoff input-readiness — also a standalone task) + **D12** (codex teammate non-interactive approvals/sandbox launch). D11+D12 together make codex/gemini teammates run hands-off; prerequisite for parallel spawning.
 - **S11c — Codex as 2nd lead:** **D1** + **D2** + **D3** + **D4** (config-driven assignment). Proves the seam is real and gives the cost dial (flip `lead_cli`, no code change to revert).
 - **DEFER (parallel spike):** Gemini/Antigravity — **D5**. Teammate-first once G0/G1 pass; lead only after G0–G6.
 
@@ -252,7 +258,8 @@ Run this as a parallel spike, **off the S10/S11 critical path**.
 | `src/agent_team/bundled/personas/*.yaml` | optional `cli: gemini` once registered; add a Gemini-friendly planner persona |
 | `src/agent_team/mcp_server.py` | **D8** new `get_recent_events(since, limit)` / `wait_for_event(types, since, timeout)` tool; **D9** add `from_`/`since` filtering to `read_messages` |
 | `src/agent_team/event_log.py`, `orchestrator.py` | **D9** `EventLog.read(..., limit=N)` tail; `reconcile_handled` uses the tail. **D11** kickoff input-readiness in `TeammateRunner.spawn` |
-| `src/agent_team/teammate_runner.py`, `cli/logs.py` | **D10** `pipe-pane` each teammate pane → `transcript.log` at spawn; `logs export` bundles transcripts |
+| `src/agent_team/teammate_runner.py`, `cli/logs.py` | **D10** `pipe-pane` each teammate pane → `transcript.log` at spawn; `logs export` bundles transcripts. **D12** apply `CliSpec.teammate_launch_args` to the `split_pane` command (codex approval/sandbox flags) |
+| `src/agent_team/cli_registry.py` (D12) | add `teammate_launch_args` to `CliSpec` (e.g. codex `["-a", "<policy>", "-s", "workspace-write", "--skip-git-repo-check"]`; claude `[]`) |
 | `tests/unit/test_cli_registry.py`, `test_orchestrator.py`, `test_mcp_server.py` | codex-lead spec invariants; codex launch-line + TOML render slots; **preamble-present slot (D6)**; **get_recent_events / read_messages-filter slots (D8/D9)**; **transcript-written slot (D10)** |
 
 ## Verification (how to test the implementation)
