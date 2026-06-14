@@ -67,14 +67,25 @@ def test_spawn_splits_pane_and_sends_persona_prompt(
 
     calls = psmux_backend.recorded_calls
     split = next(c for c in calls if "split-window" in c.args)
-    assert "claude" in " ".join(split.args)
-    # split is run from the teammate dir (so AGENTS.md is picked up via cwd)
-    assert split.cwd == str((session_dir / "teammates" / "helper-1").resolve())
+    # Teammate runs from the PROJECT root so it can edit files / run pytest / git.
+    assert split.cwd == str(project.resolve())
+    # Launch stays bare `persona.cli` — no per-CLI flags (CLI-neutral invariant).
+    joined = " ".join(split.args)
+    assert "claude" in joined
+    assert "--append-system-prompt" not in joined
+    assert "--mcp-config" not in joined
 
     send = next(c for c in calls if "send-keys" in c.args)
     keys_arg = send.args[send.args.index("-l") + 1]
-    assert "You are the Planner teammate" in keys_arg
-    assert "Plan the auth feature." in keys_arg
+    # Single-line kickoff (multi-line send_keys would submit line-by-line).
+    assert "\n" not in keys_arg
+    assert "\r" not in keys_arg
+    assert "helper-1" in keys_arg
+    # Points the teammate at its on-disk brief by absolute path.
+    brief = session_dir / "teammates" / "helper-1" / "AGENTS.md"
+    assert str(brief) in keys_arg
+    # The role/task text lives in the brief file, not in the kickoff line.
+    assert "You are the Planner teammate" not in keys_arg
 
     assert len(runner.recorded_spawns) == 1
     assert runner.recorded_spawns[0].persona == "planner"

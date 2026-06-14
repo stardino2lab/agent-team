@@ -13,6 +13,24 @@ from agent_team.psmux_backend import PsmuxBackend
 _MOCK_COMMAND = 'python -c "print(\'dry-run teammate ready\')"'
 
 
+def _kickoff_line(teammate_name: str, brief_path: Path) -> str:
+    """Single-line trigger that points the teammate at its on-disk brief.
+
+    Must stay one line: psmux send_keys types embedded newlines literally and
+    each one acts as Enter in the teammate's interactive CLI, submitting the
+    message line-by-line. The rich role/coordination/task context lives in the
+    brief file (read from a cwd-independent absolute path), keeping the launch
+    CLI-neutral — no per-CLI system-prompt flags.
+    """
+    line = (
+        f'You are agent-team teammate "{teammate_name}". '
+        f"Read your brief at {brief_path} "
+        "(role, coordination CLI, and your task), then begin. "
+        "Project conventions are in TEAM.md/AGENTS.md here."
+    )
+    return line.replace("\n", " ").replace("\r", " ")
+
+
 @dataclass
 class SpawnResult:
     pane_id: str
@@ -69,26 +87,34 @@ class TeammateRunner:
         full_prompt = f"{p.spawn_prompt_template}\n\n{prompt}".strip()
 
         if self._mock:
-            command = _MOCK_COMMAND
-            pane_cwd: Path | None = None
+            pane_id = self.psmux.split_pane(
+                psmux_session, command=_MOCK_COMMAND, cwd=None
+            )
         else:
             teammate_dir = session_dir / "teammates" / teammate_name
             teammate_dir.mkdir(parents=True, exist_ok=True)
-            agents_md = render_bundled_template(
-                "teammate/AGENTS.md.j2",
-                teammate_name=teammate_name,
-                persona_name=persona,
-                session_id=session_id,
-                project_path=str(project_path),
-                spawn_prompt=full_prompt,
+            brief_path = teammate_dir / "AGENTS.md"
+            brief_path.write_text(
+                render_bundled_template(
+                    "teammate/AGENTS.md.j2",
+                    teammate_name=teammate_name,
+                    persona_name=persona,
+                    session_id=session_id,
+                    project_path=str(project_path),
+                    spawn_prompt=full_prompt,
+                ),
+                encoding="utf-8",
             )
-            (teammate_dir / "AGENTS.md").write_text(agents_md, encoding="utf-8")
-            command = p.cli
-            pane_cwd = teammate_dir
+            # Run the teammate CLI from the project root so relative file edits,
+            # pytest, and git target the real checkout. Trigger it with a
+            # single-line kickoff pointing at the absolute brief path.
+            pane_id = self.psmux.split_pane(
+                psmux_session, command=p.cli, cwd=project_path
+            )
+            self.psmux.send_keys(
+                pane_id, _kickoff_line(teammate_name, brief_path), enter=True
+            )
 
-        pane_id = self.psmux.split_pane(psmux_session, command=command, cwd=pane_cwd)
-        if not self._mock:
-            self.psmux.send_keys(pane_id, full_prompt, enter=True)
         self.recorded_spawns.append(
             RecordedSpawn(
                 persona=persona,
