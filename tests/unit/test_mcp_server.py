@@ -338,7 +338,8 @@ def test_get_recent_events_returns_since_and_limit(mcp_context: McpContext) -> N
     assert all_evt[0]["ts"].endswith("Z")
 
     # limit tails.
-    assert [e["payload"]["n"] for e in handle_get_recent_events(mcp_context, limit=2)["events"]] == [1, 2]
+    limited = handle_get_recent_events(mcp_context, limit=2)["events"]
+    assert [e["payload"]["n"] for e in limited] == [1, 2]
 
     # since filters (exclusive, matching EventLog.read).
     cutoff = all_evt[1]["ts"]

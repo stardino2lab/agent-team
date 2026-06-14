@@ -9,6 +9,13 @@
   `teammate_ready` handshake, mail/task/shutdown, full events.jsonl audit trail.
 - Full suite: **216 passed**, ruff clean. Plan for next phase: `docs/s11-multi-cli-plan.md`.
 
+## S11a implementation ($20-lead hardening: D6/D8/D9) @ 2026-06-15
+
+- `project_loader.py` — `LEAD_ORCHESTRATION_PREAMBLE` prepended in `build_lead_context` (D6): locks the lead's low-token property structurally (orchestrate-only, no self-coding) for any gated CLI; folds in the D8 no-shell-polling line (use `wait_for_event`) and a terse-output line. No playbook can turn the lead into a coder.
+- `mcp_server.py` — two new MCP tools (D8): non-blocking `get_recent_events(since, limit)` + blocking `wait_for_event(types, since, timeout)`, event-driven via `watchfiles` (immediate check → watch `session_dir` bounded by a monotonic deadline; `_DEFAULT_WAIT_TIMEOUT=60`, `_WAIT_SAFETY_SLICE_MS=500`). The lead makes ONE blocking call and burns no tokens while waiting — replaces shell-loop polling, the biggest S10 lead-token waste. **MCP tool count 9 → 11.** `_map_tool_error` widened with `OSError`.
+- D9 bounded/filtered reads: `EventLog.read(limit=)` tail (`tail()` delegates); `read_inbox`/`handle_read_messages`/`read_messages` gain an exact `from_` sender filter composing with `since`; `reconcile_handled` bounds its ingest with `_RECONCILE_EVENT_TAIL=2000` (correctness rests on `session.json`, so an aged-out event at worst re-logs one error, never double-spawns).
+- +11 tests (D6×1, D9-read×1, D9-from_×2, D8-get×1, D8-wait×5, D9-reconcile×1). **227 passed** (+11), ruff clean.
+
 ## S7 plan review @ 2026-06-10
 
 - `docs/s7-api-sketch.md` — Textual 2×2, watchfiles, spawn modal

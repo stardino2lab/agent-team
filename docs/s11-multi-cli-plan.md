@@ -149,7 +149,7 @@ having the lead exec teammates directly or pass CLI flags itself — that would 
 to the lead CLI and destroy the mix-and-match property this plan depends on.
 
 Requirements for a heterogeneous team under a non-Claude lead: (1) the lead CLI can *call* the
-`spawn_teammate` MCP tool — verified for Codex (handshake returned all 9 tools); (2) each teammate CLI is
+`spawn_teammate` MCP tool — verified for Codex (handshake returned all 11 tools); (2) each teammate CLI is
 registered `supports_teammate=True` and installed; (3) the persona YAML's `cli:` names it. The lead CLI's
 identity is irrelevant to all three.
 
@@ -225,7 +225,7 @@ Reproduce on the box, not inferred from docs — the same bar `codex` already cl
 |------|-------------|
 | G0 | binary installed, `--version` works, launches from a non-interactive pane (no TTY assumption) |
 | G1 | headless single-shot (`-p`/`exec`) returns output and **exits cleanly** (no REPL/hang/keypress) |
-| G2 | registers the agent-team MCP server, completes a handshake returning **all 9 tools**, and **calls** at least one tool round-trip |
+| G2 | registers the agent-team MCP server, completes a handshake returning **all 11 tools**, and **calls** at least one tool round-trip |
 | G3 | global-MCP isolation flag exists and works (only our server loaded; global config NOT inherited) |
 | G4 | system-prompt / AGENTS.md injection actually applies (probe with a required output token) |
 | G5 | survives a long-running pane (hours / many turns): no auth expiry, no wedge; degrades gracefully on quota limits |
@@ -307,7 +307,7 @@ A failed gate does not block S12a — do not force the lead seat.
 
 1. **Unit:** registry invariants for codex-as-lead; `_build_lead_launch_command(cli="codex")` produces the `codex exec --ignore-user-config …` line; TOML renderer emits a parseable `[mcp_servers.agent-team]`; lead context contains the orchestration-only preamble (D6); `get_recent_events`/`wait_for_event` returns events from `events.jsonl` and `read_messages(from_=…)` filters (D8/D9); `EventLog.read(limit=N)` tails (D9); a spawned teammate's `transcript.log` is created and grows (D10).
 1b. **Token-efficiency (S11a) acceptance:** re-run the payment-api E2E with the D6/D8/D9 build and confirm the lead no longer arms shell-watchers or re-verifies code; eyeball that per-feature lead token use drops toward the ~6–8k target.
-2. **MCP interop (already proven, keep as a smoke test):** standard MCP client handshake against `python -m agent_team.mcp_server` returns the 9 tools; `codex mcp add` accepts the agent-team server.
+2. **MCP interop (already proven, keep as a smoke test):** standard MCP client handshake against `python -m agent_team.mcp_server` returns the 11 tools; `codex mcp add` accepts the agent-team server.
 3. **Live E2E (S11 acceptance):** `agent-team start` with `lead_cli: codex` on a fixture project → codex pane launches, connects to the agent-team MCP server, and successfully calls `spawn_teammate` round-trip. This is the one live, model-spending check not yet run (kept out of plan-time to avoid cost/side-effects).
 4. **Gemini gates:** the G0–G6 checklist above, scripted and reproduced on this Windows box, before any registry entry.
 
