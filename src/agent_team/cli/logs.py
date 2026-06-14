@@ -54,16 +54,27 @@ def tail_cmd(session: str, lines: int, follow: bool) -> None:
 @click.option("--session", required=True)
 @click.option("--to", "dest", required=True, type=click.Path(path_type=Path))
 def export_cmd(session: str, dest: Path) -> None:
-    """Export events.jsonl to a file."""
+    """Export a session bundle: events.jsonl + each teammate's transcript."""
     try:
         session_dir = resolve_session_dir(session)
-        source = session_dir / "events.jsonl"
-        if not source.exists():
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text("", encoding="utf-8")
+        dest.mkdir(parents=True, exist_ok=True)
+
+        events_src = session_dir / "events.jsonl"
+        events_dst = dest / "events.jsonl"
+        if events_src.exists():
+            shutil.copy2(events_src, events_dst)
         else:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, dest)
+            events_dst.write_text("", encoding="utf-8")
+
+        teammates_dir = session_dir / "teammates"
+        if teammates_dir.is_dir():
+            transcripts_dst = dest / "transcripts"
+            for member_dir in sorted(teammates_dir.iterdir()):
+                transcript = member_dir / "transcript.log"
+                if transcript.exists():
+                    transcripts_dst.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(transcript, transcripts_dst / f"{member_dir.name}.log")
+
         click.echo(str(dest))
     except CLI_ERRORS as exc:
         echo_error(str(exc))

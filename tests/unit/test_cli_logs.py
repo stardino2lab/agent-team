@@ -29,15 +29,24 @@ def test_logs_tail_and_export(cli_env: dict, session_store: SessionStore, tmp_pa
     assert tail.exit_code == 0
     assert "mail_sent" in tail.output
 
-    dest = tmp_path / "export.jsonl"
+    # Seed a teammate transcript so export bundles it alongside events.
+    transcript = session_store.session_dir("cli-logs") / "teammates" / "helper-1" / "transcript.log"
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_text("teammate did work\n", encoding="utf-8")
+
+    dest = tmp_path / "bundle"
     export = runner.invoke(
         main,
         ["logs", "export", "--session", "cli-logs", "--to", str(dest)],
         env=cli_env,
     )
     assert export.exit_code == 0
-    assert dest.exists()
-    assert "mail_sent" in dest.read_text(encoding="utf-8")
+    events_out = dest / "events.jsonl"
+    assert events_out.exists()
+    assert "mail_sent" in events_out.read_text(encoding="utf-8")
+    transcript_out = dest / "transcripts" / "helper-1.log"
+    assert transcript_out.exists()
+    assert "teammate did work" in transcript_out.read_text(encoding="utf-8")
 
 
 def test_logs_follow_once(cli_env: dict, session_store: SessionStore) -> None:
