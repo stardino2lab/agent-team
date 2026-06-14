@@ -203,8 +203,10 @@ def handle_send_message(ctx: McpContext, to: str, body: str) -> dict:
     return {"id": message.id, "to": message.to, "ts": message.ts}
 
 
-def handle_read_messages(ctx: McpContext, since: str | None = None) -> dict:
-    messages = read_inbox(ctx.session_dir, "lead", since=since)
+def handle_read_messages(
+    ctx: McpContext, since: str | None = None, from_: str | None = None
+) -> dict:
+    messages = read_inbox(ctx.session_dir, "lead", since=since, from_=from_)
     return {
         "messages": [
             {
@@ -294,9 +296,9 @@ def send_message(to: str, body: str) -> dict:
 
 
 @mcp.tool()
-def read_messages(since: str | None = None) -> dict:
-    """Read lead inbox messages, optionally since an ISO timestamp."""
-    return _run_tool(handle_read_messages, since)
+def read_messages(since: str | None = None, from_: str | None = None) -> dict:
+    """Read lead inbox messages, optionally filtered by ISO timestamp and/or sender."""
+    return _run_tool(handle_read_messages, since, from_)
 
 
 @mcp.tool()

@@ -76,6 +76,7 @@ def read_inbox(
     session_dir: Path,
     recipient: str,
     since: datetime | str | None = None,
+    from_: str | None = None,
 ) -> list[Message]:
     safe_segment(recipient, "recipient")
     inbox = session_dir / "mailbox" / f"{recipient}.jsonl"
@@ -89,6 +90,8 @@ def read_inbox(
             continue
         message = _message_from_dict(json.loads(line))
         if since_dt is not None and parse_ts(message.ts) <= since_dt:
+            continue
+        if from_ is not None and message.from_ != from_:
             continue
         messages.append(message)
     return messages

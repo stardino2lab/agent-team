@@ -10,6 +10,7 @@ import pytest
 from agent_team import tasks
 from agent_team._io import InvalidPathSegmentError, format_ts, parse_ts
 from agent_team.event_log import EventLog
+from agent_team.mailbox import send as mailbox_send
 from agent_team.mcp_server import (
     McpConfigError,
     McpContext,
@@ -303,3 +304,14 @@ def test_run_tool_maps_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENT_TEAM_SESSION_ID", raising=False)
     with pytest.raises(RuntimeError, match="AGENT_TEAM_SESSION_ID"):
         _run_tool(handle_list_teammates)
+
+
+def test_read_messages_from_filter(mcp_context: McpContext) -> None:
+    mailbox_send(mcp_context.session_dir, from_="helper-1", to="lead", body="a")
+    mailbox_send(mcp_context.session_dir, from_="helper-2", to="lead", body="b")
+
+    all_msgs = handle_read_messages(mcp_context)["messages"]
+    assert len(all_msgs) == 2
+    h1 = handle_read_messages(mcp_context, from_="helper-1")["messages"]
+    assert [m["body"] for m in h1] == ["a"]
+    assert h1[0]["from"] == "helper-1"

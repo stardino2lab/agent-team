@@ -75,3 +75,15 @@ def test_send_records_mail_sent_event(session_dir: Path, event_log: EventLog) ->
     assert len(events) == 1
     assert events[0].type == "mail_sent"
     assert events[0].payload == {"from": "lead", "to": "planner-1", "id": message.id}
+
+
+def test_read_inbox_from_filter(session_dir: Path) -> None:
+    send(session_dir, from_="helper-1", to="lead", body="a")
+    send(session_dir, from_="helper-2", to="lead", body="b")
+    send(session_dir, from_="helper-1", to="lead", body="c")
+
+    only_h1 = read_inbox(session_dir, "lead", from_="helper-1")
+    assert [m.body for m in only_h1] == ["a", "c"]
+    assert read_inbox(session_dir, "lead", from_="helper-2")[0].body == "b"
+    # No filter still returns everything.
+    assert len(read_inbox(session_dir, "lead")) == 3
