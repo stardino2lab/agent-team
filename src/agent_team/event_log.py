@@ -41,6 +41,7 @@ class EventLog:
         self,
         session_dir: Path,
         since: datetime | str | None = None,
+        limit: int | None = None,
     ) -> list[Event]:
         path = self._path(session_dir)
         if not path.exists():
@@ -56,8 +57,12 @@ class EventLog:
             if since_dt is not None and parse_ts(event.ts) <= since_dt:
                 continue
             events.append(event)
+        # Tail bound: a long-running session re-reads only the most recent
+        # `limit` events instead of the whole log. Applied AFTER `since` so the
+        # window is "the last N matching events", not "N then filter".
+        if limit is not None:
+            return events[-limit:]
         return events
 
     def tail(self, session_dir: Path, n: int = 50) -> list[Event]:
-        events = self.read(session_dir)
-        return events[-n:]
+        return self.read(session_dir, limit=n)
