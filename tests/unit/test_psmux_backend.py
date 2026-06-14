@@ -55,15 +55,23 @@ def test_mock_send_keys_with_and_without_enter(psmux_backend: PsmuxBackend) -> N
     psmux_backend.new_session("sess")
     psmux_backend.send_keys("%0", "hello")
     psmux_backend.send_keys("%0", "-flag", enter=False)
+    # enter=True must emit the literal keys and the Enter keypress as TWO
+    # separate send-keys calls — a single `-l ... Enter` would type the word
+    # "Enter" literally instead of submitting the line.
     assert psmux_backend.recorded_calls[1].args == [
         "send-keys",
         "-t",
         "%0",
         "-l",
         "hello",
-        "Enter",
     ]
     assert psmux_backend.recorded_calls[2].args == [
+        "send-keys",
+        "-t",
+        "%0",
+        "Enter",
+    ]
+    assert psmux_backend.recorded_calls[3].args == [
         "send-keys",
         "-t",
         "%0",

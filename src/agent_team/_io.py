@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -60,7 +61,13 @@ def parse_since(since: datetime | str | None) -> datetime | None:
 
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    # Atomic write: a concurrent reader (e.g. the TUI refresh loop calling
+    # store.load while the orchestrator rewrites session.json on a member
+    # update) must never observe a truncated/half-written file. Write a sibling
+    # temp file, then os.replace, which is atomic on both Windows and POSIX.
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def read_json(path: Path) -> dict:

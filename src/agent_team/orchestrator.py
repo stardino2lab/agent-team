@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agent_team._watcher import FileWatcher
+from agent_team.cli_registry import LeadCliNotSupportedError, is_lead_supported
 from agent_team.event_log import EventLog
 from agent_team.project_loader import ProjectLoader
 from agent_team.psmux_backend import PsmuxBackend
@@ -16,18 +17,16 @@ from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
 
-_SUPPORTED_LEAD_CLIS: frozenset[str] = frozenset({"claude"})
-
 
 def _check_lead_cli_supported(cli: str) -> None:
-    """Raise early if config asks for a lead CLI S9 cannot launch.
+    """Raise early if config asks for a lead CLI the registry cannot launch.
 
     Kept at start() entry so an unsupported value never gets as far as
     creating a session_dir / psmux session — the user just sees a clean
-    NotImplementedError pointing at S11+.
+    LeadCliNotSupportedError pointing at S11+.
     """
-    if cli not in _SUPPORTED_LEAD_CLIS:
-        raise NotImplementedError(
+    if not is_lead_supported(cli):
+        raise LeadCliNotSupportedError(
             f"Lead CLI {cli!r} not supported yet "
             f"(codex/antigravity planned for S11+)"
         )
@@ -83,14 +82,31 @@ def _build_lead_launch_command(
     S9 supports claude only. codex / antigravity are S11+ and would add an
     elif branch here (plus their own MCP config template). The seam is
     intentionally narrow so future additions do not touch Orchestrator.start.
+    `cli_registry.is_lead_supported` is the single source of truth for which
+    CLIs reach this branch — Orchestrator.start gates it via
+    `_check_lead_cli_supported`, so callers here see only registered names.
     """
     if cli == "claude":
+        # Embed the full resolved executable path instead of the bare name.
+        # On Windows, npm installs `claude` (a *nix shim), `claude.cmd`, and
+        # `claude.ps1` side by side; the lead pane shell's bare-name resolution
+        # is inconsistent across PowerShell profiles / execution policy and can
+        # land on a non-existent `claude.exe`, leaving the lead stuck at a shell
+        # prompt with no claude running. shutil.which picks the file the shell
+        # *should* run (claude.CMD); its full path is unquoted because install
+        # paths have no spaces, so the same line runs in both PowerShell and
+        # cmd. Falls back to the bare name when claude is not on PATH (e.g. CI)
+        # so the command stays well-formed.
+        exe = shutil.which(cli) or cli
         return (
-            f'claude --mcp-config "{mcp_config}" --strict-mcp-config '
+            f'{exe} --mcp-config "{mcp_config}" --strict-mcp-config '
             f'--append-system-prompt-file "{system_prompt_file}"'
         )
-    raise NotImplementedError(
-        f"Lead CLI {cli!r} not supported yet "
+    # Defensive: a registered lead CLI without an elif arm is a registry/builder
+    # mismatch, not a configuration error — keep the same exception type so
+    # callers do not need to branch on two error classes.
+    raise LeadCliNotSupportedError(
+        f"Lead CLI {cli!r} is registered but has no launch builder "
         f"(codex/antigravity planned for S11+)"
     )
 

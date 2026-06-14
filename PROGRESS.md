@@ -96,15 +96,27 @@
 - 신규 6 테스트 (4 unit + 1 e2e + 1 NotImplementedError + AGENTS.md 슬롯 보강)
 - **177 passed**(+5), 1 skipped, ruff clean
 
+## CLI registry seam @ 2026-06-13
+
+- Plan: `~/.claude/plans/claude-inherited-nebula.md` (5-expert review, scope reduced to data-only registry).
+- `src/agent_team/cli_registry.py` 신규 (leaf module, no agent_team transitive imports): `CliSpec(frozen)` + `__post_init__` invariant + `_REGISTRY` (`claude` lead+teammate, `codex` teammate-only) + lookup 3개 (`get_cli_spec` / `is_lead_supported` / `is_teammate_supported`) + 예외 2개 (`UnknownCliError` / `LeadCliNotSupportedError`).
+- enum 3곳을 registry lookup으로 교체: `personas.py:43`, `spawn_approval.py::_VALID_CLI` 삭제 후 `_validate_request_fields`, `orchestrator._check_lead_cli_supported` (was `_SUPPORTED_LEAD_CLIS` frozenset). 메시지 substring (`"Invalid cli"`, S11 hint) 모두 보존.
+- `orchestrator._build_lead_launch_command` 의 `NotImplementedError` → `LeadCliNotSupportedError` (동일 메시지 substring, 동일 raise 시점).
+- antigravity 는 registry 에 **등록하지 않음** — S11 PR에서 persona YAML + entry + lead launch builder 같이.
+- `_write_lead_mcp_config` 시그니처/내용 무변경(`claude-mcp.json` 그대로). S11에서 `spec.mcp_config_filename` 으로 파라미터화.
+- 테스트 신규/보강: `test_cli_registry.py` 11건 (parametrize invariant + lookup + post_init), `test_orchestrator.py` substring 분해 검증 + lead unsupported parametrize 3 케이스 (codex/antigravity/xyz) + cleanup, `test_personas.py` / `test_spawn_approval.py` antigravity/xyz reject 메시지 호환, `test_teammate_runner.py` parametrize `(claude, codex)`.
+- 문서: `tests/manual/s9-claude-lead.md:80` `NotImplementedError` → `LeadCliNotSupportedError`. `IMPLEMENTATION.md` §Schemas members.cli registry 주석 + bundled mirror 동기화 정책 한 줄. `s9-api-sketch.md` D11 cell + 테스트 슬롯 #7 갱신.
+
 ## Next action
 
 1. **S9 manual smoke** — `tests/manual/s9-claude-lead.md` 정정판 사용. psmux + claude 2.1.175 로 한 사이클.
 2. 결과 pass 면 S9 done → S10 (payment-api E2E) 진입.
+3. S11 PR — codex/antigravity 실제 lead launch builder + persona YAML + registry entry 추가.
 
-### Carried into S9 from S8 reviews
+### Carried into S9+ from earlier reviews
 
-- **Lead pane bootstrap**: `orchestrator.start` opens lead pane via `psmux.new_session` but never `send_keys` the `claude`/`codex` launch command, and never injects `project_loader.build_lead_context(playbook, extra_context)`. In S8 dry-run that is a noop; in S9 the lead must actually run with MCP config + TEAM.md context.
-- **teammate_ready handshake**: currently emitted right after `send_keys`. S9 should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
+- ✅ ~~Lead pane bootstrap~~ — S9 code-complete 에서 처리. CLI registry seam PR이 enum 추상화까지 마무리.
+- **teammate_ready handshake**: currently emitted right after `send_keys`. S10+ should wait for a real ready marker written by the teammate (per `RGIO.md`) before emitting.
 - **EventLog tail-by-type API**: `Orchestrator.reconcile_handled` reads the full events.jsonl each attach. Bound it once long-running sessions exist.
 
 ## Blockers

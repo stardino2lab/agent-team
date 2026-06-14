@@ -261,15 +261,37 @@ def test_tampered_pending_rejected_on_load(session_dir: Path, approval: SpawnApp
         approval.get_pending(session_dir)
 
 
-def test_invalid_cli_rejected(session_dir: Path, approval: SpawnApproval) -> None:
-    with pytest.raises(ValueError, match="Invalid cli"):
+@pytest.mark.parametrize("bad_cli", ["gpt", "antigravity", "xyz"])
+def test_invalid_cli_rejected(
+    session_dir: Path, approval: SpawnApproval, bad_cli: str
+) -> None:
+    """antigravity is intentionally not registered (S11) — must be rejected.
+
+    Substring "Invalid cli" is preserved so the existing match contract holds.
+    """
+    with pytest.raises(ValueError, match="Invalid cli") as exc_info:
         approval.request_spawn(
             session_dir,
             persona="planner",
-            cli="gpt",
+            cli=bad_cli,
             prompt="x",
             requested_by="lead",
         )
+    assert bad_cli in str(exc_info.value)
+
+
+def test_codex_cli_still_accepted(
+    session_dir: Path, approval: SpawnApproval
+) -> None:
+    """Regression: codex teammate spawn must remain valid after registry."""
+    req = approval.request_spawn(
+        session_dir,
+        persona="implementer",
+        cli="codex",
+        prompt="x",
+        requested_by="lead",
+    )
+    assert req.cli == "codex"
 
 
 def test_prompt_preview_truncated(session_dir: Path, approval: SpawnApproval) -> None:

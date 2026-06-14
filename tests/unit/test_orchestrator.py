@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_team.cli_registry import LeadCliNotSupportedError
 from agent_team.event_log import EventLog
 from agent_team.orchestrator import (
     Orchestrator,
@@ -449,39 +450,81 @@ def test_start_writes_lead_system_prompt_file_with_team_md_content(
     assert str(prompt_path) in keys_arg
 
 
-def test_unsupported_lead_cli_raises_not_implemented(tmp_path: Path) -> None:
-    with pytest.raises(NotImplementedError, match="S11"):
+@pytest.mark.parametrize("bad_cli", ["codex", "antigravity", "xyz"])
+def test_unsupported_lead_cli_raises_registry_error(
+    tmp_path: Path, bad_cli: str
+) -> None:
+    """`_build_lead_launch_command` is the inner seam.
+
+    For registered CLIs missing an arm (codex), the message must point at S11+.
+    Unregistered names (xyz) reach the same exception via the start() gate, so
+    the inner builder is only ever called with registered ones — this test
+    covers the defensive arm.
+    """
+    with pytest.raises(LeadCliNotSupportedError, match="S11"):
         _build_lead_launch_command(
-            "codex",
+            bad_cli,
             mcp_config=tmp_path / "x.json",
             system_prompt_file=tmp_path / "prompt.md",
         )
 
 
+def test_build_lead_launch_command_for_claude_includes_required_tokens(
+    tmp_path: Path,
+) -> None:
+    """Substring assertions on the claude launch line.
+
+    Locks the required CLI flags in place without making the whole string
+    byte-equal to a snapshot (which breaks on any reorder).
+    """
+    mcp = tmp_path / "claude-mcp.json"
+    sysprompt = tmp_path / "lead-system-prompt.md"
+    line = _build_lead_launch_command(
+        "claude", mcp_config=mcp, system_prompt_file=sysprompt
+    )
+    # The command position is the resolved claude executable: the bare name on
+    # a host without claude on PATH, or a full path like ...\claude.CMD when it
+    # resolves. Either way the first token names claude.
+    assert "claude" in line.split()[0].lower()
+    assert f'--mcp-config "{mcp}"' in line
+    assert "--strict-mcp-config" in line
+    assert f'--append-system-prompt-file "{sysprompt}"' in line
+
+
+@pytest.mark.parametrize("bad_cli", ["codex", "antigravity", "xyz"])
 def test_start_refuses_unsupported_lead_cli_before_touching_disk(
     minimal_project: Path,
     session_store: SessionStore,
     psmux_backend: PsmuxBackend,
     persona_registry: PersonaRegistry,
     event_log: EventLog,
+    bad_cli: str,
 ) -> None:
+    """fail-fast gate: unsupported lead_cli must abort before session_dir exists.
+
+    codex is registered (teammate-only); antigravity / xyz are unknown.
+    All three must hit the same gate in Orchestrator.start without creating
+    files on disk.
+    """
     config_path = minimal_project / ".agent-team" / "config.yaml"
     config_path.write_text(
         config_path.read_text(encoding="utf-8").replace(
-            "lead_cli: claude", "lead_cli: codex"
+            "lead_cli: claude", f"lead_cli: {bad_cli}"
         ),
         encoding="utf-8",
     )
     orch, ctx = _start_with_minimal(
         minimal_project,
-        session_id="s9-bad-cli",
+        session_id=f"s9-bad-cli-{bad_cli}",
         session_store=session_store,
         psmux_backend=psmux_backend,
         persona_registry=persona_registry,
         event_log=event_log,
     )
-    with pytest.raises(NotImplementedError, match="S11"):
+    with pytest.raises(LeadCliNotSupportedError) as exc_info:
         orch.start(project_path=minimal_project)
+    assert bad_cli in str(exc_info.value)
+    assert "S11" in str(exc_info.value)
     assert not ctx.session_dir.exists(), (
         "early validation must abort before session_dir is created"
     )

@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Literal
 
 from agent_team._io import format_ts, read_json, safe_segment, utc_now, write_json
+from agent_team.cli_registry import is_teammate_supported
 from agent_team.event_log import EventLog
 
 _PREVIEW_LEN = 200
 _APR_ID_PATTERN = re.compile(r"^apr-(\d+)$")
-_VALID_CLI = frozenset({"claude", "codex"})
 
 
 class SpawnPendingError(RuntimeError):
@@ -190,7 +190,7 @@ def _validate_request_fields(
 ) -> None:
     safe_segment(persona, "persona")
     safe_segment(requested_by, "requester")
-    if cli not in _VALID_CLI:
+    if not is_teammate_supported(cli):
         raise ValueError(f"Invalid cli: {cli!r}")
     if teammate_name is not None:
         safe_segment(teammate_name, "teammate")

@@ -96,18 +96,47 @@ def test_unsafe_persona_name_rejected(tmp_path: Path, empty_global_personas: Pat
         registry.load_all()
 
 
-def test_invalid_cli_raises(tmp_path: Path, empty_global_personas: Path) -> None:
+@pytest.mark.parametrize("bad_cli", ["gpt", "antigravity", "xyz"])
+def test_invalid_cli_raises(
+    tmp_path: Path, empty_global_personas: Path, bad_cli: str
+) -> None:
+    """Unregistered CLIs (including antigravity, S11 placeholder) must be rejected.
+
+    The error message must preserve persona name and the substring "Invalid cli"
+    so existing log scrapers and the `match=` clause keep working.
+    """
     project = tmp_path / "proj"
     personas_dir = project / ".agent-team" / "personas"
     personas_dir.mkdir(parents=True)
     data = {
         "name": "custom",
         "description": "bad cli",
-        "cli": "gpt",
+        "cli": bad_cli,
         "spawn_prompt_template": "x",
     }
     (personas_dir / "custom.yaml").write_text(yaml.dump(data), encoding="utf-8")
 
     registry = PersonaRegistry(project_path=project, global_dir=empty_global_personas)
-    with pytest.raises(PersonaLoadError):
+    with pytest.raises(PersonaLoadError, match="Invalid cli") as exc_info:
         registry.load_all()
+    assert "custom" in str(exc_info.value)
+    assert bad_cli in str(exc_info.value)
+
+
+def test_codex_persona_still_accepted(
+    tmp_path: Path, empty_global_personas: Path
+) -> None:
+    """Regression: codex teammate persona must remain valid after registry."""
+    project = tmp_path / "proj"
+    personas_dir = project / ".agent-team" / "personas"
+    personas_dir.mkdir(parents=True)
+    data = {
+        "name": "custom-codex",
+        "description": "codex teammate",
+        "cli": "codex",
+        "spawn_prompt_template": "x",
+    }
+    (personas_dir / "custom-codex.yaml").write_text(yaml.dump(data), encoding="utf-8")
+
+    registry = PersonaRegistry(project_path=project, global_dir=empty_global_personas)
+    assert registry.get("custom-codex").cli == "codex"

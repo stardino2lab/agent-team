@@ -74,10 +74,6 @@ class AgentTeamApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        session = self.ctx.store.load(self.ctx.session_id)
-        teammate_count = sum(1 for m in session.members if m.role == "teammate")
-        max_t = session.max_teammates
-        self.sub_title = f"{self.ctx.session_id} · {teammate_count}/{max_t} teammates"
         refresh_all_panels(self)
         if self._watcher is None:
             self._watcher = SessionWatcher(
@@ -129,6 +125,14 @@ class AgentTeamApp(App):
 
 def refresh_all_panels(app: AgentTeamApp) -> None:
     ctx = app.ctx
+    # Recompute the header teammate count on every refresh — a teammate spawned
+    # after mount must move the counter (e.g. 0/3 -> 1/3), not stay frozen at
+    # the on_mount value.
+    session = ctx.store.load(ctx.session_id)
+    teammate_count = sum(1 for m in session.members if m.role == "teammate")
+    app.sub_title = (
+        f"{ctx.session_id} · {teammate_count}/{session.max_teammates} teammates"
+    )
     app.mail.refresh_panel(ctx.session_dir)
     app.tasks.refresh_panel(ctx.session_dir)
     app.team.refresh_panel(ctx)

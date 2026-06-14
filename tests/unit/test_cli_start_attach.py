@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from agent_team.__main__ import main
+from agent_team.cli_registry import LeadCliNotSupportedError
 from agent_team.event_log import EventLog
 from agent_team.psmux_backend import PsmuxBackend, PsmuxCommandError
 from agent_team.session import SessionStore
@@ -56,8 +57,11 @@ def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
     PsmuxBackend 가 진짜 psmux 를 부르는 대신 모든 호출을 기록만 하도록
     monkeypatch — 실제 psmux 가 PATH 에 없어도 CLI 경로 검증 가능.
     """
+    # shutil is a shared module, so this also covers orchestrator's which() call
+    # that resolves the lead `claude` executable. Return a per-name fake so the
+    # psmux binary resolves to /fake/psmux and claude to /fake/claude.
     monkeypatch.setattr(
-        "agent_team.psmux_backend.shutil.which", lambda _x: "/fake/psmux"
+        "agent_team.psmux_backend.shutil.which", lambda name: f"/fake/{name}"
     )
 
     recorded: list[list[str]] = []
@@ -112,7 +116,9 @@ def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
     send_keys_lines = [r for r in recorded if r[0] == "send-keys"]
     assert send_keys_lines, "no send-keys recorded"
     payload = send_keys_lines[0][-1]
-    assert "claude --mcp-config" in payload
+    # First token is the resolved claude executable (bare name or full path).
+    assert "claude" in payload.split()[0].lower()
+    assert "--mcp-config" in payload
     assert "--strict-mcp-config" in payload
     assert "--append-system-prompt-file" in payload
     assert "lead-system-prompt.md" in payload
@@ -145,6 +151,38 @@ def test_start_refuses_when_session_exists(
     )
     assert result.exit_code != 0
     assert "already exists" in result.output or "already exists" in (result.stderr or "")
+
+
+def test_start_unsupported_lead_cli_reports_clean_error(
+    cli_env: dict[str, str],
+    tmp_path: Path,
+) -> None:
+    """A lead_cli the registry rejects must echo a clean error, not a traceback.
+
+    Regression: start_cmd's except tuple did not include LeadCliNotSupportedError,
+    so `lead_cli: codex` propagated a raw Python traceback to the user instead of
+    the S11+ guidance message the orchestrator raises.
+    """
+    proj = tmp_path / "codex-lead"
+    (proj / ".agent-team").mkdir(parents=True)
+    (proj / ".agent-team" / "config.yaml").write_text(
+        "project_name: codex-lead\nmax_teammates: 2\nlead_cli: codex\n",
+        encoding="utf-8",
+    )
+    (proj / "TEAM.md").write_text("# Team\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["start", "--project", str(proj), "--session", "codex-lead",
+         "--no-psmux", "--no-block"],
+        env=cli_env,
+    )
+    assert result.exit_code != 0
+    # The clean guidance message reached the user (stderr), not a stack trace.
+    combined = result.output + (result.stderr or "")
+    assert "S11" in combined
+    assert not isinstance(result.exception, LeadCliNotSupportedError)
 
 
 def test_attach_errors_when_project_path_missing(
@@ -185,8 +223,9 @@ def test_attach_falls_back_when_psmux_session_missing(
     )
 
     # Pretend psmux is installed so PsmuxBackend(mock=False) constructs cleanly.
+    # Per-name fake also covers orchestrator resolving the lead claude binary.
     monkeypatch.setattr(
-        "agent_team.psmux_backend.shutil.which", lambda _x: "/fake/psmux"
+        "agent_team.psmux_backend.shutil.which", lambda name: f"/fake/{name}"
     )
 
     def boom(self, _session):  # type: ignore[no-untyped-def]

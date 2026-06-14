@@ -146,10 +146,13 @@ class PsmuxBackend:
 
     def send_keys(self, target: str, keys: str, *, enter: bool = True) -> None:
         safe_target = self._validate_target(target)
-        parts = ["send-keys", "-t", safe_target, "-l", keys]
+        # `-l` sends keys literally (no key-name lookup). Enter MUST be a
+        # separate send-keys call WITHOUT -l, otherwise tmux types the literal
+        # string "Enter" instead of pressing the Enter key and the command line
+        # never executes (the lead `claude` launch silently fails as a result).
+        self._run(["send-keys", "-t", safe_target, "-l", keys])
         if enter:
-            parts.append("Enter")
-        self._run(parts)
+            self._run(["send-keys", "-t", safe_target, "Enter"])
 
     def kill_pane(self, target: str) -> None:
         safe_target = self._validate_target(target)

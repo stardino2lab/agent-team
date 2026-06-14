@@ -255,6 +255,14 @@ Added after P0 to align with full design. **S1+ implementations MUST follow thes
 }
 ```
 
+`members[].cli` is one of the names registered in `agent_team.cli_registry`
+(currently `claude` and `codex`). Adding a new CLI requires a single entry
+in that module — `personas.py`, `spawn_approval.py`, and `orchestrator.py`
+all derive validation from the registry. `antigravity` is reserved for S11+
+and is intentionally NOT registered yet; configuring `lead_cli: antigravity`
+raises `LeadCliNotSupportedError` from `Orchestrator.start` before any disk
+state is created.
+
 #### mailbox message (one JSONL line)
 
 ```json
@@ -398,6 +406,8 @@ Bundled in `personas/*.yaml`. Merge order:
 3. `./.agent-team/personas/` (project, highest priority)
 
 Enforce `allowed_personas` from consumer `config.yaml` on spawn.
+
+**Bundled mirror.** `src/agent_team/bundled/personas/` and `src/agent_team/bundled/templates/project/` must stay byte-identical to the repo-root `personas/` and `templates/project/` copies. The bundled tree is what ships with `pip install -e .`; the root copies are the editing surface. Add or change a file in one place and apply the same change to the other in the same commit — there is no sync automation yet.
 
 ---
 

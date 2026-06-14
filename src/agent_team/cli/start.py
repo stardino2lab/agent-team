@@ -8,13 +8,14 @@ from pathlib import Path
 import click
 
 from agent_team.cli._helpers import echo_error, make_orchestrator
+from agent_team.cli_registry import LeadCliNotSupportedError
 from agent_team.project_loader import (
     PlaybookNotFoundError,
     ProjectConfigError,
     TeamMdNotFoundError,
 )
 from agent_team.psmux_backend import PsmuxBackend, PsmuxNotFoundError
-from agent_team.session import SessionNotFoundError, SessionStore
+from agent_team.session import SessionExistsError, SessionNotFoundError, SessionStore
 
 
 @click.command("start")
@@ -77,7 +78,13 @@ def start_cmd(
     )
     try:
         orch.start(project_path=project, playbook=playbook, context_text=context_text)
-    except (ProjectConfigError, TeamMdNotFoundError, PlaybookNotFoundError) as exc:
+    except (
+        ProjectConfigError,
+        TeamMdNotFoundError,
+        PlaybookNotFoundError,
+        LeadCliNotSupportedError,
+        SessionExistsError,
+    ) as exc:
         echo_error(str(exc))
 
     click.echo(

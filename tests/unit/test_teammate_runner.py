@@ -133,6 +133,44 @@ def test_spawn_mock_uses_safe_command_skips_send_keys_and_no_agents_md(
     )
 
 
+@pytest.mark.parametrize(
+    "persona,expected_cli",
+    [("planner", "claude"), ("implementer", "codex")],
+)
+def test_spawn_passes_persona_cli_to_split_pane(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+    persona: str,
+    expected_cli: str,
+) -> None:
+    """The persona's `cli` field flows verbatim into the split-pane command.
+
+    Regression hook for cli-registry rollout: registry change must not alter
+    which literal command name reaches psmux. PATH is irrelevant here —
+    PsmuxBackend(mock=True) only records arguments.
+    """
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    result = runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name=f"helper-{persona}",
+            persona=persona,
+        )
+    )
+
+    assert result.cli == expected_cli
+    split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
+    assert expected_cli in split.args, (
+        f"expected literal {expected_cli!r} in split-window args, got {split.args!r}"
+    )
+
+
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:
     project = tmp_path / "proj"
     project.mkdir()

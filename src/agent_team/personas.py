@@ -7,6 +7,7 @@ from pathlib import Path
 
 from agent_team._io import load_yaml_dict, safe_segment
 from agent_team.bundled_paths import bundled_personas_dir
+from agent_team.cli_registry import is_teammate_supported
 
 
 class PersonaNotFoundError(LookupError):
@@ -40,7 +41,7 @@ def _persona_from_dict(data: dict) -> Persona:
     if not isinstance(name, str):
         raise PersonaLoadError("Persona name must be a string")
     safe_segment(name, "persona")
-    if cli not in ("claude", "codex"):
+    if not is_teammate_supported(cli):
         raise PersonaLoadError(f"Invalid cli for persona {name!r}: {cli!r}")
 
     coordination = data.get("coordination_cli")

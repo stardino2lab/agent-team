@@ -78,5 +78,8 @@
   `send_keys` to the new pane. It does NOT mean the LLM has actually
   finished booting. Real ready-handshake is S10+.
 - `lead_cli` other than `claude` (e.g. `codex`, `antigravity`) raises
-  `NotImplementedError` from `_build_lead_launch_command` - this is
-  intentional in S9 and only switches on in S11+.
+  `LeadCliNotSupportedError` from `agent_team.cli_registry` - the check
+  fires in `Orchestrator.start` before any session_dir / psmux session is
+  created, so a misconfigured `lead_cli` aborts cleanly. This is intentional
+  in S9 and only switches on in S11+, when codex / antigravity get their
+  own launch builder + lead support flag.
