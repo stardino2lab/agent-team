@@ -1,4 +1,7 @@
 # Guide playbook — lead decides when to spawn; not a hard pipeline.
+# Self-contained copy for this fixture so `agent-team start --playbook
+# new-feature` works when run from the project dir (mirrors the bundled
+# new-feature playbook; kept in-tree intentionally per the S10 E2E layout).
 name: new-feature
 description: New feature — plan, implement, test, review
 mode: guide

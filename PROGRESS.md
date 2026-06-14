@@ -149,8 +149,18 @@ relative `AGENT_TEAM_HOME` can't hide the brief from the project-cwd teammate) +
 test hardening (direct `_kickoff_line` tests, brief-content lock). 208 passed,
 ruff clean.
 
-Remaining S10 slices: S10c payment-api fixture + codex teammate (same
-CLI-neutral launch); S10d manual E2E.
+Remaining S10 slices: S10d manual E2E.
+
+### S10c — payment-api fixture + codex teammate (2026-06-15)
+
+Added `tests/fixtures/payment-api/` (the S10d E2E project): config with the 4
+team personas, TEAM.md, a minimal `PaymentService` + passing tests (the pattern
+the team extends for refunds), the new-feature playbook, and a standalone
+pyproject so a teammate can run `pytest tests/ -q` there. Codex teammates use the
+same CLI-neutral launch (no per-CLI code); a test spawns the codex implementer
+against the fixture and asserts a bare `codex` command with no flags. Root
+pyproject ignores `tests/fixtures` for pytest + ruff. 3-expert review: 0 BLOCKING
+(verification deepened with the codex-spawn test). 216 passed, ruff clean.
 
 ### S10b — real teammate_ready handshake (2026-06-15)
 
