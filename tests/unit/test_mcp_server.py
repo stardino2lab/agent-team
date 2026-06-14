@@ -315,3 +315,32 @@ def test_read_messages_from_filter(mcp_context: McpContext) -> None:
     h1 = handle_read_messages(mcp_context, from_="helper-1")["messages"]
     assert [m["body"] for m in h1] == ["a"]
     assert h1[0]["from"] == "helper-1"
+
+
+def test_get_recent_events_returns_since_and_limit(mcp_context: McpContext) -> None:
+    from datetime import datetime
+
+    from agent_team.mcp_server import handle_get_recent_events
+
+    sd = mcp_context.session_dir
+    el = mcp_context.event_log
+    # Distinct timestamps: format_ts is second-resolution, so events appended in
+    # the same second share a ts and the exclusive `since` filter cannot separate
+    # them. Spacing them by a second keeps the since assertion below meaningful.
+    t0 = datetime.fromisoformat("2026-06-10T12:00:00+00:00")
+    el.append(sd, type_="session_started", payload={"n": 0}, ts=t0)
+    el.append(sd, type_="mail_sent", payload={"n": 1}, ts=t0 + timedelta(seconds=1))
+    el.append(sd, type_="teammate_ready", payload={"n": 2}, ts=t0 + timedelta(seconds=2))
+
+    all_evt = handle_get_recent_events(mcp_context)["events"]
+    assert [e["type"] for e in all_evt] == ["session_started", "mail_sent", "teammate_ready"]
+    assert all_evt[0]["payload"] == {"n": 0}
+    assert all_evt[0]["ts"].endswith("Z")
+
+    # limit tails.
+    assert [e["payload"]["n"] for e in handle_get_recent_events(mcp_context, limit=2)["events"]] == [1, 2]
+
+    # since filters (exclusive, matching EventLog.read).
+    cutoff = all_evt[1]["ts"]
+    later = handle_get_recent_events(mcp_context, since=cutoff)["events"]
+    assert [e["payload"]["n"] for e in later] == [2]

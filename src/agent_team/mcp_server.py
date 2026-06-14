@@ -263,6 +263,17 @@ def handle_list_teammates(ctx: McpContext) -> dict:
     return {"members": [member_to_response(m) for m in session.members]}
 
 
+def _event_to_dict(event) -> dict:
+    return {"type": event.type, "ts": event.ts, "payload": event.payload}
+
+
+def handle_get_recent_events(
+    ctx: McpContext, since: str | None = None, limit: int | None = None
+) -> dict:
+    events = ctx.event_log.read(ctx.session_dir, since=since, limit=limit)
+    return {"events": [_event_to_dict(e) for e in events]}
+
+
 def _run_tool(handler, *args, **kwargs):
     try:
         ctx = resolve_context()
@@ -299,6 +310,16 @@ def send_message(to: str, body: str) -> dict:
 def read_messages(since: str | None = None, from_: str | None = None) -> dict:
     """Read lead inbox messages, optionally filtered by ISO timestamp and/or sender."""
     return _run_tool(handle_read_messages, since, from_)
+
+
+@mcp.tool()
+def get_recent_events(since: str | None = None, limit: int | None = None) -> dict:
+    """Read recent coordination events (teammate_ready/task_*/mail_sent), newest-bounded.
+
+    Non-blocking catch-up. Pass `since` (ISO ts) to get only newer events and
+    `limit` to cap how many are returned. Use wait_for_event to BLOCK for the next one.
+    """
+    return _run_tool(handle_get_recent_events, since, limit)
 
 
 @mcp.tool()
