@@ -263,6 +263,33 @@ Run this as a parallel spike, **off the S10/S11 critical path**.
 3. **Live E2E (S11 acceptance):** `agent-team start` with `lead_cli: codex` on a fixture project → codex pane launches, connects to the agent-team MCP server, and successfully calls `spawn_teammate` round-trip. This is the one live, model-spending check not yet run (kept out of plan-time to avoid cost/side-effects).
 4. **Gemini gates:** the G0–G6 checklist above, scripted and reproduced on this Windows box, before any registry entry.
 
+## Carried backlog (real, not yet scheduled into S11a/b/c)
+
+Deferred items from earlier reviews + the S10 token review that are NOT yet
+placed in a phase and are NOT rejected — recorded here so they aren't lost.
+
+- **`Orchestrator.shutdown` + session archive** (s9-api-sketch out-of-scope; no
+  method exists today). Current teardown is per-teammate `shutdown_teammate`
+  (kills pane + drops member) + `orchestrator_stopped` on Ctrl-C. Missing: one
+  graceful "end session" path that kills all panes, flushes, and archives the
+  session dir (events + D10 transcripts) for later inspection. Natural pairing
+  with D10 + `logs export`.
+- **Model-tier wiring (cost dial, part 2).** `Persona.model_hint`
+  (`personas.py:27`) already EXISTS but is a **dead field** — never applied to
+  the teammate launch — and there is no `lead_model` config knob. The S10 token
+  review's "Sonnet lead for routine / Opus for hard, cheap teammate tiers"
+  recommendation therefore has no implementation path. Wire `model_hint` into
+  each CLI's launch (claude `--model`, codex `-m`) + add `lead_model` to config.
+  Same shape as D4 (config decides; code knows only capabilities).
+- **Strict playbook mode.** Only `playbook_mode: guide` is implemented. The
+  token review flagged a `strict` (hard-pipeline) mode that lets a cheaper/Sonnet
+  lead just gate approvals instead of improvising. Optional — add only if the
+  guide-mode lead is still too token-hungry after D6/D8.
+
+Effectively closed (no longer needed): **codex-specific AGENTS.md sections**
+(s9 out-of-scope) — subsumed by the CLI-neutral single-line "read your brief"
+kickoff (S10a); the shared brief worked for codex teammates in the S10 E2E.
+
 ## Out of scope (later)
 
 - Nested / recursive sub-leads (B2) — rejected.
