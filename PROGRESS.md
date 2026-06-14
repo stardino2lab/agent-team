@@ -151,15 +151,31 @@ ruff clean.
 
 Remaining: the S10d manual E2E **run** (human-driven; see below).
 
-### S10d — manual E2E gate prepared (2026-06-15)
+### S10d — manual E2E gate (2026-06-15) — PASSED
 
-`tests/manual/s10-payment-api-e2e.md` refreshed to match the implemented
-behavior: copy the fixture to a writable dir, the readiness handshake step
-(teammates run `agent-team teammate ready`; teammate_ready is deferred; Team
-panel shows starting→running), teammate cwd = project root, and pass criteria
-covering the full audit trail + detach/attach durability. The actual run needs
-real Claude + Codex CLIs doing work and human observation — it cannot be
-automated; hand off to the user like the S9 smoke.
+Ran the full payment-api E2E with real CLIs. A heterogeneous team —
+planner(claude) → implementer(codex) → tester(codex) → reviewer(claude),
+orchestrated by a claude/Opus lead — built `PaymentService.refund` + tests,
+`pytest tests/ -q` → **4 passed**, reviewer APPROVED. Real handshake fired
+(`teammate_ready` only after each teammate ran `agent-team teammate ready`);
+mail + task board + shutdown all worked; full audit trail in events.jsonl.
+
+**Findings (S10+/S11 follow-ups):**
+- **Teammate kickoff timing (top priority).** The kickoff `send_keys` fires
+  immediately after `split_pane`, before the teammate CLI is ready for input —
+  worst with codex's first-run "trust this folder?" prompt, which eats the
+  keystrokes. The kickoff text *and* its Enter are dropped, so each teammate
+  needed a manual nudge to start. S10a fixed the literal-"Enter" bug; this is
+  the separate *input-readiness* gap. Fix options: wait for/retry until the CLI
+  acks, or have the teammate auto-read its brief without a send_keys kickoff.
+- **Codex work visibility.** Coordination (mail, task_claimed/completed,
+  teammate_ready) is captured, but a teammate's detailed work transcript is not
+  in events.jsonl (by design — it's a coordination audit, not a transcript).
+  The artifact is the code/git diff. Richer per-teammate visibility would need
+  pane-output capture.
+- **Parallelism.** The architecture supports concurrent teammates
+  (max_teammates panes + async mail/task); the lead serialized here by choice.
+  Smooth parallel spawning depends on fixing the kickoff-timing gap first.
 
 ### S10c — payment-api fixture + codex teammate (2026-06-15)
 
@@ -207,4 +223,4 @@ passed, ruff clean.
 | S7 | done |
 | S8 | done |
 | S9 | done (manual smoke passed 2026-06-14) |
-| S10 | code complete (S10a-c done 2026-06-15); manual E2E pending |
+| S10 | done (manual E2E passed 2026-06-15) |
