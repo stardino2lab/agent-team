@@ -194,6 +194,24 @@ class PsmuxBackend:
         safe_target = self._validate_target(target)
         return self._run(["capture-pane", "-t", safe_target, "-p"])
 
+    def pipe_pane(self, target: str, log_path: Path) -> None:
+        """Stream the pane's output to `log_path` (`pipe-pane -o <cmd>`) (D10).
+
+        Gives each teammate a durable transcript of its real work (events.jsonl
+        and mail only hold coordination). The redirect command appends the pane
+        stream to the absolute log path; the pane's shell runs it, so the exact
+        portability of `cat >>` is verified live (see tests/manual). The log path
+        is resolved so it lands in the session dir no matter the pane cwd.
+        """
+        safe_target = self._validate_target(target)
+        # as_posix() so the path uses forward slashes: a Windows backslash path
+        # (C:\Users\...\t.log) inside the double-quoted redirect would be mangled
+        # by the pane shell's escape handling. Forward slashes are accepted by
+        # cmd.exe/PowerShell and unix shells alike. (Whether `cat` itself exists
+        # in the pane's shell is verified live — see tests/manual.)
+        redirect = f'cat >> "{log_path.resolve().as_posix()}"'
+        self._run(["pipe-pane", "-t", safe_target, "-o", redirect])
+
     def _validate_session_name(self, name: str) -> str:
         return safe_segment(name, "psmux_session")
 

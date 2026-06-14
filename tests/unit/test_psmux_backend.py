@@ -174,6 +174,26 @@ def test_capture_pane_rejects_bad_target() -> None:
         backend.capture_pane("%bad!")
 
 
+def test_pipe_pane_mock_records_argv_with_log_path(tmp_path: Path) -> None:
+    backend = PsmuxBackend(mock=True)
+    log = tmp_path / "transcript.log"
+    backend.pipe_pane("%2", log)
+    call = next(c for c in backend.recorded_calls if "pipe-pane" in c.args)
+    assert call.args[:4] == ["pipe-pane", "-t", "%2", "-o"]
+    # The redirect command names the absolute log path (forward-slash form so the
+    # pane shell does not mangle Windows backslashes) so the transcript lands in
+    # the session dir regardless of the pane's cwd.
+    assert log.resolve().as_posix() in call.args[4]
+
+
+def test_pipe_pane_rejects_bad_target(tmp_path: Path) -> None:
+    from agent_team._io import InvalidPathSegmentError
+
+    backend = PsmuxBackend(mock=True)
+    with pytest.raises(InvalidPathSegmentError):
+        backend.pipe_pane("not-a-pane!", tmp_path / "t.log")
+
+
 @pytest.mark.integration
 @pytest.mark.skipif(shutil.which("psmux") is None, reason="psmux not installed")
 def test_real_new_session_and_list() -> None:
