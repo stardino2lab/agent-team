@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -420,6 +421,45 @@ def test_start_renders_mcp_config_into_session_dir(
     env = server["env"]
     assert env["AGENT_TEAM_SESSION_ID"] == "s9-mcp"
     assert env["AGENT_TEAM_PROJECT_PATH"] == str(minimal_project.resolve())
+
+
+def test_write_lead_mcp_config_codex_renders_codex_home_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from agent_team.orchestrator import _write_lead_mcp_config
+
+    codex_home = tmp_path / "codex-home"
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    project = tmp_path / "proj"
+    project.mkdir()
+
+    path = _write_lead_mcp_config(session_dir, "sid-1", project, cli="codex")
+
+    # The profile lands in CODEX_HOME, named <profile>.config.toml — NOT in session_dir.
+    assert path == codex_home / "agent-team-sid-1.config.toml"
+    assert path.exists()
+    parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+    server = parsed["mcp_servers"]["agent-team"]
+    assert server["command"] == sys.executable
+    assert server["args"] == ["-m", "agent_team.mcp_server"]
+    assert server["env"]["AGENT_TEAM_SESSION_ID"] == "sid-1"
+    assert server["env"]["AGENT_TEAM_PROJECT_PATH"] == str(project.resolve())
+
+
+def test_write_lead_mcp_config_claude_still_writes_json(tmp_path: Path) -> None:
+    from agent_team.orchestrator import _write_lead_mcp_config
+
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    project = tmp_path / "proj"
+    project.mkdir()
+
+    path = _write_lead_mcp_config(session_dir, "sid-2", project, cli="claude")
+    assert path == session_dir / "claude-mcp.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["mcpServers"]["agent-team"]["command"] == sys.executable
 
 
 def test_start_sends_keys_to_lead_pane_with_claude_command(

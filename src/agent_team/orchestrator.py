@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import threading
@@ -31,6 +32,79 @@ from agent_team.teammate_runner import TeammateRunner
 _RECONCILE_EVENT_TAIL = 2000
 
 
+# Bootstrap prompt for a codex lead (codex exec's PROMPT arg). One line, no double
+# quotes (it is wrapped in "..." on the launch command line). The full lead
+# context (D6 preamble + TEAM.md + playbook) is delivered via the working-root
+# AGENTS.md, since codex has no --append-system-prompt-file.
+_CODEX_LEAD_BOOTSTRAP = (
+    "Read AGENTS.md in this working directory and orchestrate the team strictly "
+    "per it, using ONLY the agent-team MCP tools. Do not read, edit, or run "
+    "project code yourself."
+)
+
+
+def _codex_home() -> Path:
+    """Codex's home dir (where profiles + auth live). Honors $CODEX_HOME."""
+    env = os.environ.get("CODEX_HOME")
+    return Path(env) if env else Path.home() / ".codex"
+
+
+def _codex_profile_name(session_id: str) -> str:
+    return f"agent-team-{session_id}"
+
+
+def _lead_mcp_server_config(session_id: str, project_path: Path) -> dict:
+    """The agent-team MCP server entry shared by every lead-config format.
+
+    Runs under sys.executable (the interpreter with agent_team installed), not a
+    bare 'python' that may differ in the pane. AGENT_TEAM_HOME captured at write
+    time from default_base_dir().
+    """
+    return {
+        "command": sys.executable,
+        "args": ["-m", "agent_team.mcp_server"],
+        "env": {
+            "AGENT_TEAM_HOME": str(default_base_dir()),
+            "AGENT_TEAM_SESSION_ID": session_id,
+            "AGENT_TEAM_PROJECT_PATH": str(project_path.resolve()),
+        },
+    }
+
+
+def _render_codex_profile_toml(server_cfg: dict) -> str:
+    """Render the codex profile TOML for [mcp_servers.agent-team].
+
+    json.dumps produces valid TOML for our values: a JSON string is a valid TOML
+    basic string (backslashes doubled, so Windows paths survive: \\\\ -> \\), and a
+    JSON list of strings is a valid TOML array. No lone backslashes are emitted,
+    so there are no invalid TOML escapes.
+    """
+    lines = [
+        "[mcp_servers.agent-team]",
+        f"command = {json.dumps(server_cfg['command'])}",
+        f"args = {json.dumps(server_cfg['args'])}",
+        "",
+        "[mcp_servers.agent-team.env]",
+    ]
+    for key, value in server_cfg["env"].items():
+        lines.append(f"{key} = {json.dumps(value)}")
+    return "\n".join(lines) + "\n"
+
+
+def _write_codex_lead_agents_md(session_dir: Path, lead_context_text: str) -> Path:
+    """Write the lead context to {session_dir}/lead/AGENTS.md; return the lead dir.
+
+    codex exec -C <lead dir> uses this as its working root, so codex reads this
+    AGENTS.md as the lead's system prompt (codex has no --append-system-prompt-file).
+    Kept under session_dir (not the project) so the project's own AGENTS.md is not
+    used and the project is not polluted.
+    """
+    lead_dir = session_dir / "lead"
+    lead_dir.mkdir(parents=True, exist_ok=True)
+    (lead_dir / "AGENTS.md").write_text(lead_context_text, encoding="utf-8")
+    return lead_dir
+
+
 def _check_lead_cli_supported(cli: str) -> None:
     """Raise early if config asks for a lead CLI the registry cannot launch.
 
@@ -48,38 +122,32 @@ def _check_lead_cli_supported(cli: str) -> None:
 def _write_lead_mcp_config(
     session_dir: Path, session_id: str, project_path: Path, *, cli: str
 ) -> Path:
-    """Render the lead's MCP config JSON to {session_dir}/<registry filename>.
+    """Write the lead's MCP config in the CLI's format; return the written path.
 
-    Uses json.dumps (not Jinja) so Windows backslashes do not need manual
-    escaping inside the template. AGENT_TEAM_HOME is captured from
-    default_base_dir() at write time — env var changes after this function
-    returns do not flow into the file. A fresh `agent-team start` would
-    re-render with the new value.
-
-    The MCP server runs under ``sys.executable`` (the interpreter that has
-    agent_team installed) instead of a bare ``python`` that may resolve to a
-    different/absent interpreter in the lead pane's environment. The output
-    filename comes from the cli registry so it stays correct as S11+ adds
-    other lead CLIs.
+    claude (json): {session_dir}/<registry filename>, loaded via --mcp-config.
+    codex (toml): {CODEX_HOME}/agent-team-<sid>.config.toml, loaded via --profile
+    (codex cannot load an arbitrary config-file path; a profile keeps only a
+    shell-safe name on the launch line). --ignore-user-config isolates from the
+    user's base config.toml while auth still resolves from CODEX_HOME.
     """
-    config = {
-        "mcpServers": {
-            "agent-team": {
-                "command": sys.executable,
-                "args": ["-m", "agent_team.mcp_server"],
-                "env": {
-                    "AGENT_TEAM_HOME": str(default_base_dir()),
-                    "AGENT_TEAM_SESSION_ID": session_id,
-                    "AGENT_TEAM_PROJECT_PATH": str(project_path.resolve()),
-                },
-            }
-        }
-    }
-    filename = get_cli_spec(cli).mcp_config_filename
-    assert filename is not None  # lead-capable CLIs always declare one (CliSpec)
-    path = session_dir / filename
-    path.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    return path
+    spec = get_cli_spec(cli)
+    server_cfg = _lead_mcp_server_config(session_id, project_path)
+    if spec.mcp_format == "json":
+        filename = spec.mcp_config_filename
+        assert filename is not None  # json format guarantees a filename (CliSpec)
+        config = {"mcpServers": {"agent-team": server_cfg}}
+        path = session_dir / filename
+        path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+        return path
+    if spec.mcp_format == "toml":
+        home = _codex_home()
+        home.mkdir(parents=True, exist_ok=True)
+        path = home / f"{_codex_profile_name(session_id)}.config.toml"
+        path.write_text(_render_codex_profile_toml(server_cfg), encoding="utf-8")
+        return path
+    raise LeadCliNotSupportedError(
+        f"Lead CLI {cli!r} has no MCP config renderer for format {spec.mcp_format!r}"
+    )
 
 
 def _write_lead_system_prompt(session_dir: Path, lead_context_text: str) -> Path:
