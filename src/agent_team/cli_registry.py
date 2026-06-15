@@ -67,7 +67,20 @@ _REGISTRY: dict[str, CliSpec] = {
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
         mcp_format="toml",
     ),
-    # antigravity/gemini: S12 — added with persona YAML + (for lead) launch builder.
+    "gemini": CliSpec(
+        name="gemini",
+        supports_lead=False,  # S12b promotes to lead after G0-G6 pass
+        supports_teammate=True,
+        mcp_config_filename=None,
+        # D12-analog: gemini teammate runs INTERACTIVELY in its pane and gets the
+        # send_keys kickoff, so these are the interactive auto-approve flags (NOT
+        # -p, which is headless single-shot). yolo auto-approves all tools;
+        # skip-trust skips the workspace-trust prompt. Pending live G0/G1
+        # verification on this box — see tests/manual/s12-gemini-gates.md.
+        teammate_launch_args=("--approval-mode", "yolo", "--skip-trust"),
+        mcp_format=None,
+    ),
+    # antigravity (agy): no MCP subcommand — not viable as lead/MCP-teammate; deferred.
 }
 
 
