@@ -24,9 +24,9 @@ def test_spec_invariant(name: str, spec: CliSpec) -> None:
     """
     assert spec.name == name
     if spec.supports_lead:
+        assert spec.mcp_format is not None
+    if spec.mcp_format == "json":
         assert spec.mcp_config_filename is not None
-    else:
-        assert spec.mcp_config_filename is None
     assert spec.supports_lead or spec.supports_teammate
 
 
@@ -37,10 +37,12 @@ def test_claude_is_registered_as_lead_and_teammate() -> None:
     assert spec.mcp_config_filename == "claude-mcp.json"
 
 
-def test_codex_is_teammate_only() -> None:
+def test_codex_is_lead_and_teammate() -> None:
     spec = get_cli_spec("codex")
-    assert spec.supports_lead is False
+    assert spec.supports_lead is True
     assert spec.supports_teammate is True
+    assert spec.mcp_format == "toml"
+    # codex uses a CODEX_HOME profile, not a session-dir file.
     assert spec.mcp_config_filename is None
 
 
@@ -72,6 +74,7 @@ def test_post_init_rejects_lead_without_filename() -> None:
             supports_lead=True,
             supports_teammate=False,
             mcp_config_filename=None,
+            mcp_format="json",
         )
 
 
@@ -89,6 +92,40 @@ def test_lead_cli_not_supported_error_is_value_error() -> None:
     """Callers should be able to catch ValueError; we keep the hierarchy flat."""
     assert issubclass(LeadCliNotSupportedError, ValueError)
     assert issubclass(UnknownCliError, ValueError)
+
+
+def test_codex_is_lead_capable_with_toml_format() -> None:
+    from agent_team.cli_registry import get_cli_spec, is_lead_supported
+
+    codex = get_cli_spec("codex")
+    assert codex.supports_lead is True
+    assert codex.mcp_format == "toml"
+    # codex uses a CODEX_HOME profile, not a session-dir file.
+    assert codex.mcp_config_filename is None
+    assert is_lead_supported("codex") is True
+
+
+def test_claude_lead_uses_json_format() -> None:
+    from agent_team.cli_registry import get_cli_spec
+
+    claude = get_cli_spec("claude")
+    assert claude.mcp_format == "json"
+    assert claude.mcp_config_filename == "claude-mcp.json"
+
+
+def test_cli_spec_lead_requires_mcp_format() -> None:
+    from agent_team.cli_registry import CliSpec
+
+    import pytest
+
+    with pytest.raises(ValueError, match="mcp_format"):
+        CliSpec(
+            name="x",
+            supports_lead=True,
+            supports_teammate=False,
+            mcp_config_filename=None,
+            mcp_format=None,
+        )
 
 
 def test_codex_teammate_launch_args_bypass() -> None:

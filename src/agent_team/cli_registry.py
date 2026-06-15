@@ -3,8 +3,8 @@
 Leaf module — does NOT import other agent_team modules. Owns the single source
 of truth for which CLIs the orchestrator recognises and what each one can do.
 
-Currently registered: claude (lead + teammate), codex (teammate only).
-antigravity is planned for S11+ and is intentionally NOT registered yet;
+Currently registered: claude (lead + teammate), codex (lead + teammate).
+antigravity is planned for S12 and is intentionally NOT registered yet;
 adding it here without the matching lead launch builder / persona YAML would
 leave a dead spawn path.
 """
@@ -33,11 +33,19 @@ class CliSpec:
     # codex: run non-interactively (no per-command approval, no sandbox, no trust
     # prompt) so a teammate pane works hands-off. claude: none (bare launch).
     teammate_launch_args: tuple[str, ...] = ()
+    # How the lead MCP config is delivered: "json" (a file passed via
+    # --mcp-config, claude) or "toml" (a CODEX_HOME profile loaded via --profile,
+    # codex). Required for any lead-capable CLI.
+    mcp_format: str | None = None
 
     def __post_init__(self) -> None:
-        if self.supports_lead and not self.mcp_config_filename:
+        if self.supports_lead and not self.mcp_format:
             raise ValueError(
-                f"{self.name}: supports_lead=True requires mcp_config_filename"
+                f"{self.name}: supports_lead=True requires mcp_format"
+            )
+        if self.mcp_format == "json" and not self.mcp_config_filename:
+            raise ValueError(
+                f"{self.name}: mcp_format='json' requires mcp_config_filename"
             )
         if not (self.supports_lead or self.supports_teammate):
             raise ValueError(f"{self.name}: must support at least one role")
@@ -49,15 +57,17 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_lead=True,
         supports_teammate=True,
         mcp_config_filename="claude-mcp.json",
+        mcp_format="json",
     ),
     "codex": CliSpec(
         name="codex",
-        supports_lead=False,
+        supports_lead=True,
         supports_teammate=True,
         mcp_config_filename=None,
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
+        mcp_format="toml",
     ),
-    # antigravity: S11 — added together with persona YAML + lead launch builder.
+    # antigravity/gemini: S12 — added with persona YAML + (for lead) launch builder.
 }
 
 
