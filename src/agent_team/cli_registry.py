@@ -3,10 +3,10 @@
 Leaf module — does NOT import other agent_team modules. Owns the single source
 of truth for which CLIs the orchestrator recognises and what each one can do.
 
-Currently registered: claude (lead + teammate), codex (lead + teammate).
-antigravity is planned for S12 and is intentionally NOT registered yet;
-adding it here without the matching lead launch builder / persona YAML would
-leave a dead spawn path.
+Currently registered: claude (lead + teammate), codex (lead + teammate),
+gemini (teammate only — lead is S12b, after its G0-G6 gates pass).
+antigravity (agy) is intentionally NOT registered: no MCP subcommand, so it
+cannot be an MCP lead/teammate; deferred.
 """
 
 from __future__ import annotations
