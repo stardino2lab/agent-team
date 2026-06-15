@@ -39,4 +39,11 @@ def test_bundled_templates_match_root() -> None:
 def test_bundled_personas_accessible_via_importlib() -> None:
     personas = files("agent_team.bundled").joinpath("personas")
     names = sorted(item.name for item in personas.iterdir() if item.name.endswith(".yaml"))
-    assert names == ["implementer.yaml", "planner.yaml", "reviewer.yaml", "tester.yaml"]
+    assert names == [
+        "gemini-implementer.yaml",
+        "gemini-planner.yaml",
+        "implementer.yaml",
+        "planner.yaml",
+        "reviewer.yaml",
+        "tester.yaml",
+    ]

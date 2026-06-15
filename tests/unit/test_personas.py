@@ -13,9 +13,18 @@ from agent_team.personas import PersonaLoadError, PersonaNotFoundError, PersonaR
 
 def test_bundled_personas_load(persona_registry: PersonaRegistry) -> None:
     personas = persona_registry.load_all()
-    assert set(personas) == {"planner", "implementer", "reviewer", "tester"}
+    assert set(personas) == {
+        "planner", "implementer", "reviewer", "tester",
+        "gemini-implementer", "gemini-planner",
+    }
     assert personas["planner"].cli == "claude"
     assert personas["implementer"].cli == "codex"
+
+
+def test_gemini_personas_bundled(persona_registry: PersonaRegistry) -> None:
+    personas = persona_registry.load_all()
+    assert personas["gemini-implementer"].cli == "gemini"
+    assert personas["gemini-planner"].cli == "gemini"
 
 
 def test_list_personas_sorted(persona_registry: PersonaRegistry) -> None:

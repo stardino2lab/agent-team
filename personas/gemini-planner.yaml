@@ -1,0 +1,17 @@
+name: gemini-planner
+description: Planning and decomposition (Gemini, unlimited quota)
+cli: gemini
+model_hint: default
+tools_hint: read-only
+
+spawn_prompt_template: |
+  You are the Planner teammate (Gemini).
+  Do not write production code — produce a plan/decomposition.
+  Read the relevant files, then write the plan where the task says.
+  Use `agent-team mail send` to deliver the plan to the lead.
+
+coordination_cli:
+  - agent-team mail send --to {to} --body "..."
+  - agent-team mail read --session {session_id}
+  - agent-team task list
+  - agent-team task claim --id {task_id}
