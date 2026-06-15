@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S10 done (real-token E2E passed) on main — Next: S11 (multi-CLI + $20-lead token/observability hardening)
+## Current: S11a/b/c done on s11 (codex now a 2nd config-driven lead) — Next: S11 E2E token review + S12 (Gemini/Antigravity)
 
 ## Last completed: S10 payment-api E2E @ 2026-06-15 — PASSED
 
@@ -25,6 +25,15 @@
 - `cli/logs.py` — `logs export --to <dir>` writes a bundle DIRECTORY: `events.jsonl` + `transcripts/<name>.log` per teammate with a captured transcript (was a single events file).
 - Live behavior (real pipe-pane on Windows, codex no-approval run, capture-pane readiness) is mocked in unit tests — verified manually via `tests/manual/s11b-teammate-hardening.md`.
 - +10 tests (D12×2, capture_pane×2, pipe_pane×2, readiness-helper×2, spawn-wiring×2; logs export updated in place). **237 passed** (+10), ruff clean. Existing `test_spawn_passes_persona_cli_to_split_pane[implementer-codex]` updated to a substring check (the codex command now carries the bypass flag, so the literal CLI name is no longer a standalone argv element).
+
+## S11c implementation (codex as 2nd verified lead: D1/D2/D3/D4) @ 2026-06-15
+
+- `cli_registry.py` — `CliSpec.mcp_format: str | None = None` (after `teammate_launch_args`). New invariant: a lead-capable CLI requires `mcp_format`; `mcp_format="json"` also requires `mcp_config_filename`. **D3/D4:** codex flipped `supports_lead=True`, `mcp_format="toml"` (filename stays `None` — codex uses a CODEX_HOME profile, not a session-dir file); claude `mcp_format="json"`. Module docstring + antigravity note retargeted S11→S12.
+- `orchestrator.py` **(D2)** — `_write_lead_mcp_config` is now format-dispatched on `CliSpec.mcp_format`: claude writes the JSON file as before; codex renders a CODEX_HOME profile `{CODEX_HOME}/agent-team-<sid>.config.toml` (via `_render_codex_profile_toml`, `json.dumps` → valid Windows-safe TOML, parsed by `tomllib` in tests). New helpers `_codex_home` (honors `$CODEX_HOME`), `_codex_profile_name`, `_lead_mcp_server_config` (shared server entry), `_write_codex_lead_agents_md` (lead context → `{session_dir}/lead/AGENTS.md`, codex's working root), and `_CODEX_LEAD_BOOTSTRAP`.
+- `orchestrator.py` **(D1/D3)** — `_build_lead_launch_command` gains a `codex` arm: `codex exec --ignore-user-config --skip-git-repo-check --profile agent-team-<sid> -C "<lead dir>" -o "<last>" "<bootstrap>"`. Only a shell-safe profile name + double-quoted paths/prompt on the line (no inline `-c`). Signature widened (all kwargs optional); defensive arm message retargeted S11→S12.
+- `orchestrator.py` **(D4)** — `start()` branches on `spec.mcp_format`: claude keeps the JSON + `--append-system-prompt-file` path; codex writes the working-root lead AGENTS.md and launches `codex exec` with the profile. Partial-start `except` also unlinks the CODEX_HOME profile (it lives outside `session_dir`, so `rmtree` misses it). Lead selection is config-driven (`config.yaml: lead_cli`) — flipping to/from codex is a one-line revert (cost dial).
+- The live codex-as-lead E2E (does codex actually launch, load the profile under `--ignore-user-config`, connect MCP, orchestrate autonomously) is NOT auto-tested — it is the `tests/manual/s11c-codex-lead.md` checklist (the profile-load is the key live unknown). `docs/s11-multi-cli-plan.md` D3 carries the profile-deviation note.
+- +8 unit tests (registry ×3 new + 3 updated; write-config ×2; launch-line ×1; codex start ×1), −2 removed codex parametrize cases (now a supported lead); `test_cli_start_attach` unsupported-lead test re-pointed codex→antigravity. **242 passed**, ruff clean. NO test wrote into the real `~/.codex` — CODEX_HOME is redirected to tmp via `monkeypatch.setenv` in every codex test.
 
 ## S7 plan review @ 2026-06-10
 

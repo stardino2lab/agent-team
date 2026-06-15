@@ -160,6 +160,17 @@ identity is irrelevant to all three.
 | D1 | Lead launch dispatch | Generalize `orchestrator._build_lead_launch_command` from the `if cli == "claude"` special-case into a per-CLI dispatch keyed on `CliSpec`. Stays an `elif` chain (no Protocol/ABC), consistent with the S9 decision. Add the `codex` branch. |
 | D2 | MCP config renderer | Split the single hardcoded JSON renderer (`_write_lead_mcp_config`, JSON `claude-mcp.json`) into a format-dispatched renderer. Add a `mcp_format` field to `CliSpec` (`"json"` for claude, `"toml"` for codex). `mcp_config_filename` already exists on `CliSpec`. |
 | D3 | Codex as 2nd verified lead | `cli_registry`: set `codex` `supports_lead=True`, `mcp_config_filename="codex-mcp.toml"` (or inline `-c`), `mcp_format="toml"`. Launch via `codex exec` + `--ignore-user-config` (global-MCP isolation, the `--strict-mcp-config` equivalent) + the agent-team server injected. System prompt via the PROMPT arg + the lead's AGENTS.md (codex has no `--append-system-prompt-file`). |
+
+> **S11c implementation note (D2/D3 deviation — profile, not session-dir file).**
+> codex cannot load an arbitrary config-file path, so the MCP config is delivered
+> as a **CODEX_HOME profile** `{CODEX_HOME}/agent-team-<sid>.config.toml` loaded via
+> `codex exec --ignore-user-config --profile agent-team-<sid>` (only a shell-safe
+> profile *name* lands on the launch line — no inline `-c` values). Accordingly
+> codex's registry `mcp_config_filename` stays **`None`** (it is NOT a session-dir
+> `codex-mcp.toml`); `mcp_format="toml"` drives the profile renderer and the path
+> is derived. The CliSpec invariant is therefore "lead requires `mcp_format`;
+> `json` format requires `mcp_config_filename`". The live profile-load under
+> `--ignore-user-config` is verified by `tests/manual/s11c-codex-lead.md`.
 | D4 | Config-driven role assignment | Lead via `config.yaml: lead_cli`; teammate-to-CLI via per-persona YAML `cli:` field. Code only knows *capabilities* (registry flags); config decides *assignment*. Switching lead = one-line `lead_cli` flip → cheap A/B / reversibility. |
 | D5 | Gemini/Antigravity — **committed as S12** | **Stay UNREGISTERED** in `cli_registry` until its verification gates pass (a registry entry without a launch builder is a dead spawn path) — but scheduled as the **S12 milestone**, not an open-ended defer. S12a registers it as a *teammate* (after G0/G1 + its D12-analog approval flags); S12b promotes to lead (after all G0–G6) as a config + renderer drop-in, no rebuild. The G0–G6 spike can run in parallel during S11. See the *S12* section. |
 | D6 | Lead orchestration-only preamble | Add a base lead system-prompt preamble (currently absent — `build_lead_context` has no role framing) that says: *orchestrate only; delegate all file reads/edits/tests to teammates; never review or write code directly; keep context lean*. This locks the low-token property **structurally**, not by playbook convention. |
