@@ -565,6 +565,35 @@ def test_build_lead_launch_command_for_claude_includes_required_tokens(
     assert f'--append-system-prompt-file "{sysprompt}"' in line
 
 
+def test_build_lead_launch_command_for_codex_includes_required_tokens(
+    tmp_path: Path,
+) -> None:
+    from agent_team.orchestrator import _build_lead_launch_command
+
+    lead_dir = tmp_path / "session" / "lead"
+    last = tmp_path / "session" / "lead-last.txt"
+    line = _build_lead_launch_command(
+        "codex",
+        session_id="sid-9",
+        project_path=tmp_path / "proj",
+        lead_dir=lead_dir,
+        output_last_message=last,
+    )
+    assert "codex" in line.split()[0].lower()
+    assert "exec" in line
+    assert "--ignore-user-config" in line
+    assert "--skip-git-repo-check" in line
+    # Profile NAME on the command line (shell-safe) — not inline -c values.
+    assert "--profile agent-team-sid-9" in line
+    assert f'-C "{lead_dir}"' in line
+    assert f'-o "{last}"' in line
+    # Bootstrap prompt is present and double-quote-wrapped.
+    assert '"Read AGENTS.md' in line
+    # NOT the claude flags.
+    assert "--mcp-config" not in line
+    assert "--append-system-prompt-file" not in line
+
+
 @pytest.mark.parametrize("bad_cli", ["codex", "antigravity", "xyz"])
 def test_start_refuses_unsupported_lead_cli_before_touching_disk(
     minimal_project: Path,

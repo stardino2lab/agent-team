@@ -166,39 +166,55 @@ def _write_lead_system_prompt(session_dir: Path, lead_context_text: str) -> Path
 
 
 def _build_lead_launch_command(
-    cli: str, *, mcp_config: Path, system_prompt_file: Path
+    cli: str,
+    *,
+    mcp_config: Path | None = None,
+    system_prompt_file: Path | None = None,
+    session_id: str | None = None,
+    project_path: Path | None = None,
+    lead_dir: Path | None = None,
+    output_last_message: Path | None = None,
 ) -> str:
-    """Compose the lead CLI launch line that gets send_keys'd to the lead pane.
+    """Compose the lead CLI launch line send_keys'd to the lead pane (per-CLI).
 
-    S9 supports claude only. codex / antigravity are S11+ and would add an
-    elif branch here (plus their own MCP config template). The seam is
-    intentionally narrow so future additions do not touch Orchestrator.start.
-    `cli_registry.is_lead_supported` is the single source of truth for which
-    CLIs reach this branch — Orchestrator.start gates it via
-    `_check_lead_cli_supported`, so callers here see only registered names.
+    claude: --mcp-config <json> --strict-mcp-config --append-system-prompt-file.
+    codex: codex exec --ignore-user-config --profile <name> -C <lead dir> -o ...
+    + a bootstrap PROMPT (the lead context rides the working-root AGENTS.md, since
+    codex has no --append-system-prompt-file). Stays an elif chain (no Protocol),
+    per the S9 decision. Only registered lead CLIs reach here (start() gates via
+    _check_lead_cli_supported).
     """
     if cli == "claude":
-        # Embed the full resolved executable path instead of the bare name.
-        # On Windows, npm installs `claude` (a *nix shim), `claude.cmd`, and
-        # `claude.ps1` side by side; the lead pane shell's bare-name resolution
-        # is inconsistent across PowerShell profiles / execution policy and can
-        # land on a non-existent `claude.exe`, leaving the lead stuck at a shell
-        # prompt with no claude running. shutil.which picks the file the shell
-        # *should* run (claude.CMD); its full path is unquoted because install
-        # paths have no spaces, so the same line runs in both PowerShell and
-        # cmd. Falls back to the bare name when claude is not on PATH (e.g. CI)
-        # so the command stays well-formed.
+        # Full resolved exe (Windows: claude.CMD shim resolution is inconsistent
+        # across PowerShell profiles); falls back to the bare name off PATH.
         exe = shutil.which(cli) or cli
         return (
             f'{exe} --mcp-config "{mcp_config}" --strict-mcp-config '
             f'--append-system-prompt-file "{system_prompt_file}"'
         )
-    # Defensive: a registered lead CLI without an elif arm is a registry/builder
-    # mismatch, not a configuration error — keep the same exception type so
-    # callers do not need to branch on two error classes.
+    if cli == "codex":
+        exe = shutil.which(cli) or cli
+        profile = _codex_profile_name(session_id)
+        return " ".join(
+            [
+                exe,
+                "exec",
+                "--ignore-user-config",
+                "--skip-git-repo-check",
+                "--profile",
+                profile,
+                "-C",
+                f'"{lead_dir}"',
+                "-o",
+                f'"{output_last_message}"',
+                f'"{_CODEX_LEAD_BOOTSTRAP}"',
+            ]
+        )
+    # Defensive: a registered lead CLI without an arm is a registry/builder
+    # mismatch. antigravity/gemini land here until S12 adds their arm.
     raise LeadCliNotSupportedError(
         f"Lead CLI {cli!r} is registered but has no launch builder "
-        f"(codex/antigravity planned for S11+)"
+        f"(antigravity/gemini planned for S12+)"
     )
 
 
