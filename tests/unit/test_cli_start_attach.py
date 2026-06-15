@@ -160,13 +160,14 @@ def test_start_unsupported_lead_cli_reports_clean_error(
     """A lead_cli the registry rejects must echo a clean error, not a traceback.
 
     Regression: start_cmd's except tuple did not include LeadCliNotSupportedError,
-    so `lead_cli: codex` propagated a raw Python traceback to the user instead of
-    the S11+ guidance message the orchestrator raises.
+    so an unsupported lead_cli propagated a raw Python traceback to the user
+    instead of the guidance message the orchestrator raises. codex is now a
+    supported lead (S11c), so antigravity stands in as the still-unsupported one.
     """
-    proj = tmp_path / "codex-lead"
+    proj = tmp_path / "antigravity-lead"
     (proj / ".agent-team").mkdir(parents=True)
     (proj / ".agent-team" / "config.yaml").write_text(
-        "project_name: codex-lead\nmax_teammates: 2\nlead_cli: codex\n",
+        "project_name: antigravity-lead\nmax_teammates: 2\nlead_cli: antigravity\n",
         encoding="utf-8",
     )
     (proj / "TEAM.md").write_text("# Team\n", encoding="utf-8")
@@ -174,7 +175,7 @@ def test_start_unsupported_lead_cli_reports_clean_error(
     runner = CliRunner()
     result = runner.invoke(
         main,
-        ["start", "--project", str(proj), "--session", "codex-lead",
+        ["start", "--project", str(proj), "--session", "antigravity-lead",
          "--no-psmux", "--no-block"],
         env=cli_env,
     )

@@ -316,20 +316,33 @@ class Orchestrator:
         try:
             members_started: list[str] = ["lead"]
             if not self.ctx.no_psmux:
+                spec = get_cli_spec(lead_cli)
                 mcp_config_path = _write_lead_mcp_config(
                     self.ctx.session_dir, self.ctx.session_id, project_path, cli=lead_cli
                 )
                 lead_context = loader.build_lead_context(
                     playbook_name=playbook, extra_context=context_text
                 )
-                prompt_path = _write_lead_system_prompt(
-                    self.ctx.session_dir, lead_context.text
-                )
-                launch_cmd = _build_lead_launch_command(
-                    lead_cli,
-                    mcp_config=mcp_config_path,
-                    system_prompt_file=prompt_path,
-                )
+                if spec.mcp_format == "json":
+                    prompt_path = _write_lead_system_prompt(
+                        self.ctx.session_dir, lead_context.text
+                    )
+                    launch_cmd = _build_lead_launch_command(
+                        lead_cli,
+                        mcp_config=mcp_config_path,
+                        system_prompt_file=prompt_path,
+                    )
+                else:  # toml (codex): working-root AGENTS.md + --profile
+                    lead_dir = _write_codex_lead_agents_md(
+                        self.ctx.session_dir, lead_context.text
+                    )
+                    launch_cmd = _build_lead_launch_command(
+                        lead_cli,
+                        session_id=self.ctx.session_id,
+                        project_path=project_path,
+                        lead_dir=lead_dir,
+                        output_last_message=self.ctx.session_dir / "lead-last.txt",
+                    )
                 lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
                 self.ctx.psmux.send_keys(lead_pane, launch_cmd, enter=True)
                 # CLI entry (not `python -m agent_team.tui`) so the session id
@@ -378,6 +391,20 @@ class Orchestrator:
                 print(
                     "Orchestrator.start cleanup failed for "
                     f"{self.ctx.session_dir}: {cleanup_exc!r}",
+                    file=sys.stderr,
+                )
+            # The codex lead profile lives in CODEX_HOME, outside session_dir, so
+            # the rmtree above misses it. Best-effort remove on partial start.
+            try:
+                profile = (
+                    _codex_home()
+                    / f"{_codex_profile_name(self.ctx.session_id)}.config.toml"
+                )
+                profile.unlink(missing_ok=True)
+            except OSError as profile_exc:
+                print(
+                    "Orchestrator.start codex profile cleanup failed: "
+                    f"{profile_exc!r}",
                     file=sys.stderr,
                 )
             raise

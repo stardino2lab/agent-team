@@ -116,8 +116,6 @@ def test_claude_lead_uses_json_format() -> None:
 def test_cli_spec_lead_requires_mcp_format() -> None:
     from agent_team.cli_registry import CliSpec
 
-    import pytest
-
     with pytest.raises(ValueError, match="mcp_format"):
         CliSpec(
             name="x",

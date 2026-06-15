@@ -462,6 +462,53 @@ def test_write_lead_mcp_config_claude_still_writes_json(tmp_path: Path) -> None:
     assert data["mcpServers"]["agent-team"]["command"] == sys.executable
 
 
+def test_start_codex_lead_writes_profile_agents_and_sends_codex_exec(
+    minimal_project: Path,
+    session_store: SessionStore,
+    psmux_backend: PsmuxBackend,
+    persona_registry: PersonaRegistry,
+    event_log: EventLog,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    # Flip the lead to codex via config (D4: config-driven lead selection).
+    config_path = minimal_project / ".agent-team" / "config.yaml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8") + "\nlead_cli: codex\n",
+        encoding="utf-8",
+    )
+
+    orch, ctx = _start_with_minimal(
+        minimal_project,
+        session_id="s11c-codex",
+        session_store=session_store,
+        psmux_backend=psmux_backend,
+        persona_registry=persona_registry,
+        event_log=event_log,
+    )
+    try:
+        orch.start(project_path=minimal_project)
+    finally:
+        orch.stop_watching()
+
+    # Profile written to CODEX_HOME.
+    profile = codex_home / "agent-team-s11c-codex.config.toml"
+    assert profile.exists()
+    # Lead context delivered via working-root AGENTS.md (D6 preamble inside).
+    agents_md = ctx.session_dir / "lead" / "AGENTS.md"
+    assert agents_md.exists()
+    assert "You are the team LEAD" in agents_md.read_text(encoding="utf-8")
+    # Lead pane launched with codex exec + profile.
+    send_calls = [c for c in psmux_backend.recorded_calls if "send-keys" in c.args]
+    payload = " ".join(send_calls[0].args)
+    assert "codex" in payload
+    assert "exec" in payload
+    assert "--profile agent-team-s11c-codex" in payload
+    assert "--mcp-config" not in payload  # not the claude path
+
+
 def test_start_sends_keys_to_lead_pane_with_claude_command(
     minimal_project: Path,
     session_store: SessionStore,
@@ -524,18 +571,18 @@ def test_start_writes_lead_system_prompt_file_with_team_md_content(
     assert str(prompt_path) in keys_arg
 
 
-@pytest.mark.parametrize("bad_cli", ["codex", "antigravity", "xyz"])
+@pytest.mark.parametrize("bad_cli", ["antigravity", "xyz"])
 def test_unsupported_lead_cli_raises_registry_error(
     tmp_path: Path, bad_cli: str
 ) -> None:
     """`_build_lead_launch_command` is the inner seam.
 
-    For registered CLIs missing an arm (codex), the message must point at S11+.
-    Unregistered names (xyz) reach the same exception via the start() gate, so
-    the inner builder is only ever called with registered ones — this test
-    covers the defensive arm.
+    antigravity/unknown names have no launch arm and reach the defensive arm
+    (codex now has one). Unregistered names (xyz) reach the same exception via
+    the start() gate, so the inner builder is only ever called with registered
+    ones — this test covers the defensive arm.
     """
-    with pytest.raises(LeadCliNotSupportedError, match="S11"):
+    with pytest.raises(LeadCliNotSupportedError, match="S12"):
         _build_lead_launch_command(
             bad_cli,
             mcp_config=tmp_path / "x.json",
@@ -594,7 +641,7 @@ def test_build_lead_launch_command_for_codex_includes_required_tokens(
     assert "--append-system-prompt-file" not in line
 
 
-@pytest.mark.parametrize("bad_cli", ["codex", "antigravity", "xyz"])
+@pytest.mark.parametrize("bad_cli", ["antigravity", "xyz"])
 def test_start_refuses_unsupported_lead_cli_before_touching_disk(
     minimal_project: Path,
     session_store: SessionStore,
@@ -605,9 +652,8 @@ def test_start_refuses_unsupported_lead_cli_before_touching_disk(
 ) -> None:
     """fail-fast gate: unsupported lead_cli must abort before session_dir exists.
 
-    codex is registered (teammate-only); antigravity / xyz are unknown.
-    All three must hit the same gate in Orchestrator.start without creating
-    files on disk.
+    antigravity / xyz are not lead-supported (codex now is). Both must hit the
+    same gate in Orchestrator.start without creating files on disk.
     """
     config_path = minimal_project / ".agent-team" / "config.yaml"
     config_path.write_text(
