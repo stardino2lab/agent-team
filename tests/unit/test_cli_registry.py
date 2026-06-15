@@ -47,7 +47,7 @@ def test_codex_is_lead_and_teammate() -> None:
 
 
 def test_antigravity_is_not_registered() -> None:
-    """antigravity is S11 — must not be silently accepted."""
+    """antigravity is S12 — must not be silently accepted."""
     with pytest.raises(UnknownCliError):
         get_cli_spec("antigravity")
     assert is_teammate_supported("antigravity") is False

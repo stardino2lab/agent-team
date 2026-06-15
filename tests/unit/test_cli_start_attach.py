@@ -182,7 +182,7 @@ def test_start_unsupported_lead_cli_reports_clean_error(
     assert result.exit_code != 0
     # The clean guidance message reached the user (stderr), not a stack trace.
     combined = result.output + (result.stderr or "")
-    assert "S11" in combined
+    assert "S12" in combined
     assert not isinstance(result.exception, LeadCliNotSupportedError)
 
 

@@ -673,7 +673,7 @@ def test_start_refuses_unsupported_lead_cli_before_touching_disk(
     with pytest.raises(LeadCliNotSupportedError) as exc_info:
         orch.start(project_path=minimal_project)
     assert bad_cli in str(exc_info.value)
-    assert "S11" in str(exc_info.value)
+    assert "S12" in str(exc_info.value)
     assert not ctx.session_dir.exists(), (
         "early validation must abort before session_dir is created"
     )

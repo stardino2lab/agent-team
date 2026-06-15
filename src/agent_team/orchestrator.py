@@ -110,12 +110,12 @@ def _check_lead_cli_supported(cli: str) -> None:
 
     Kept at start() entry so an unsupported value never gets as far as
     creating a session_dir / psmux session — the user just sees a clean
-    LeadCliNotSupportedError pointing at S11+.
+    LeadCliNotSupportedError pointing at S12+.
     """
     if not is_lead_supported(cli):
         raise LeadCliNotSupportedError(
             f"Lead CLI {cli!r} not supported yet "
-            f"(codex/antigravity planned for S11+)"
+            f"(antigravity/gemini planned for S12+)"
         )
 
 
