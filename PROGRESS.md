@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S11a/b/c done on s11 (codex now a 2nd config-driven lead) — Next: S11 E2E token review + S12 (Gemini/Antigravity)
+## Current: S11a/b/c done on s11 (codex now a 2nd config-driven lead) — Next: S11 E2E token review + S12 (agy/Antigravity)
 
 ## Last completed: S10 payment-api E2E @ 2026-06-15 — PASSED
 
@@ -35,12 +35,19 @@
 - The live codex-as-lead E2E (does codex actually launch, load the profile under `--ignore-user-config`, connect MCP, orchestrate autonomously) is NOT auto-tested — it is the `tests/manual/s11c-codex-lead.md` checklist (the profile-load is the key live unknown). `docs/s11-multi-cli-plan.md` D3 carries the profile-deviation note.
 - +8 unit tests (registry ×3 new + 3 updated; write-config ×2; launch-line ×1; codex start ×1), −2 removed codex parametrize cases (now a supported lead); `test_cli_start_attach` unsupported-lead test re-pointed codex→antigravity. **242 passed**, ruff clean. NO test wrote into the real `~/.codex` — CODEX_HOME is redirected to tmp via `monkeypatch.setenv` in every codex test.
 
-## S12a implementation (gemini as teammate — D5 partial) @ 2026-06-15
+## S12a implementation (agy as teammate — replaces gemini) @ 2026-06-19
 
-- `cli_registry.py` — registered `gemini` `CliSpec`: `supports_teammate=True`, `supports_lead=False` (lead deferred to S12b after G0–G6), `mcp_config_filename=None`, `mcp_format=None`. `teammate_launch_args=("--approval-mode", "yolo", "--skip-trust")` — INTERACTIVE auto-approve flags (the teammate runs in a pane + gets the send_keys kickoff), NOT `-p`/`--prompt` (headless single-shot, which would exit before the kickoff). `yolo` auto-approves all tools (D12-analog); `skip-trust` skips the workspace-trust prompt (D11-analog). Read by the RUNNER from the registry — lead/teammate decoupling intact. antigravity note updated: no MCP subcommand → not viable as lead/MCP-teammate, deferred.
-- `bundled/personas/gemini-implementer.yaml` + `gemini-planner.yaml` (mirrored byte-for-byte into root `personas/` for the parity invariant) — `cli: gemini` (heavy coding + planning, unlimited quota). Spawned via the generic teammate path (no new launch builder); the runner applies the registry's interactive auto-approve args. **Opt-in**: a project must add them to `allowed_personas` — no default/fixture/template config includes them, so existing claude/codex teams are unaffected.
-- Live gemini behavior (headless/interactive launch, auto-approve, the `agent-team` shell helper under gemini, transcript) is NOT auto-tested — it needs the real binary + tokens + auth. It is the new `tests/manual/s12-gemini-gates.md` (G0–G6 verification gates, run on the Windows box) + `tests/manual/s12a-gemini-teammate.md` (S12a live checklist). S12b (gemini lead) stays plan-only pending G0–G6.
-- +6 unit tests (registry ×2, persona load ×1, spawn interactive-auto-approve ×1, parametrize gemini case +1, bundled importlib/parity set extended). Bundled-set assertions extended (never weakened): `test_personas::test_bundled_personas_load`, `test_teammate_runner::test_spawn_passes_persona_cli_to_split_pane` parametrize, `test_bundled::test_bundled_personas_accessible_via_importlib`; `test_mcp_server::test_list_personas_filters_allowed` stays green (filtered by allowed_personas). **248 passed** (+6 over 242), ruff clean.
+Redirected from gemini to **agy** (Antigravity CLI, v1.0.10, Claude-Code-derived).
+The gemini S12a slice (registry entry + `gemini-*` personas + 6 tests) was
+**superseded** — removed, not kept alongside. Spec/plan:
+`docs/superpowers/specs/2026-06-19-s12a-agy-teammate-design.md`,
+`docs/superpowers/plans/2026-06-19-s12a-agy-teammate.md`.
+
+- `cli_registry.py` — registered `agy` `CliSpec` (replaced `gemini`): `supports_teammate=True`, `supports_lead=False` (lead deferred — agy has no `mcp` subcommand, so it can't yet host the agent-team MCP server), `mcp_config_filename=None`, `mcp_format=None`. `teammate_launch_args=("--dangerously-skip-permissions",)` — agy is Claude-Code-derived, so a single interactive auto-approve flag (confirmed in `agy --help`) covers all tool approvals (replaces gemini's `--approval-mode yolo --skip-trust` pair). INTERACTIVE (the teammate runs in a pane + gets the send_keys kickoff), NOT `-p`/`--print` (headless single-shot, which would exit before the kickoff). Read by the RUNNER from the registry — lead/teammate decoupling intact. `antigravity` (the long product-name string) stays unregistered as the tests' unsupported stand-in; `agy` is the registered binary name.
+- `bundled/personas/agy-implementer.yaml` + `agy-planner.yaml` (mirrored byte-for-byte into root `personas/` for the parity invariant) — `cli: agy` (heavy coding + planning). Spawned via the generic teammate path (no new launch builder); the runner applies the registry's interactive auto-approve arg. **Opt-in**: a project must add them to `allowed_personas` — no default/fixture/template config includes them, so existing claude/codex teams are unaffected.
+- `orchestrator.py` — the two defensive lead-not-supported hint messages retargeted `antigravity/gemini` → `antigravity/agy` (still match `"S12"`, the only asserted substring).
+- Live agy behavior (interactive launch, auto-approve, first-run trust prompt, the `agent-team` shell helper under agy) is NOT auto-tested — it needs the real binary + tokens + auth. It is `tests/manual/s12-agy-gates.md`: G0 (no-token: version/exit, `--dangerously-skip-permissions`, `-p/--print`, no `mcp` subcommand) is **DONE/PASS** on this box; G1 + helper-under-agy are the remaining token gates. Lead is blocked on an MCP spike (how agy hosts an MCP server — `.mcp.json`? `agy plugin import claude`?).
+- Test count unchanged at **248 passed** (the 6 gemini cases were swapped 1:1 for agy — registry ×2, persona load ×1, spawn auto-approve ×1, parametrize case ×1, bundled importlib/parity set), ruff clean.
 
 ## S7 plan review @ 2026-06-10
 
@@ -261,4 +268,4 @@ passed, ruff clean.
 | S9 | done (manual smoke passed 2026-06-14) |
 | S10 | done (manual E2E passed 2026-06-15) |
 | S11 | planned — multi-CLI (codex 2nd lead) + $20-lead token/observability hardening (D6/D8/D9/D10/D11/D12); see `docs/s11-multi-cli-plan.md` |
-| S12 | planned — Gemini/Antigravity teammate→lead, gated on G0–G6 on-machine verification |
+| S12 | S12a (agy/Antigravity teammate) code-complete @ 2026-06-19, G0 live gate PASS — G1+helper token gates pending; lead deferred (no MCP subcommand). See `tests/manual/s12-agy-gates.md` |

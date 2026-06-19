@@ -5,7 +5,7 @@ Milestone spec for the agent-team orchestrator.
 
 **Status (2026-06-15):** S0–S10 complete. S10 payment-api E2E passed with real
 tokens (Claude lead + Codex/Claude teammates). Full suite **216 passed**, ruff
-clean. **S11/S12** (multi-CLI: codex 2nd lead + Gemini/Antigravity, plus
+clean. **S11/S12** (multi-CLI: codex 2nd lead + agy/Antigravity, plus
 $20-lead token/observability hardening) are specced separately in
 [s11-multi-cli-plan.md](s11-multi-cli-plan.md) — not in this file.
 

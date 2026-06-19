@@ -16,7 +16,7 @@
 1. **S11a — $20-lead 하드닝 (최우선):** D6 orchestration-only preamble + D8 event-driven wait(폴링 제거) + D9 bounded/filtered reads
 2. **S11b — 관측/신뢰성:** D10 팀원 transcript 캡처 + D11 kickoff input-readiness + D12 codex 팀원 비대화형 launch
 3. **S11c — codex 2nd lead:** D1/D2(per-CLI dispatch + JSON/TOML 렌더러) + D3 + D4(config 기반 역할 배정)
-4. **S12 (병렬 spike):** Gemini/Antigravity 설치 + G0–G6 검증 → 팀원(S12a) → 리드(S12b)
+4. **S12 (agy/Antigravity):** S12a 팀원 code-complete(@2026-06-19, gemini 치환) — G0 무토큰 게이트 PASS, G1+helper 토큰 게이트 잔여. 리드는 MCP 서브커맨드 부재로 보류(별도 spike). 상세: `tests/manual/s12-agy-gates.md`
 
 상세 결정·검증은 [docs/s11-multi-cli-plan.md](docs/s11-multi-cli-plan.md) 참조.
 
