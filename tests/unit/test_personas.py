@@ -15,16 +15,16 @@ def test_bundled_personas_load(persona_registry: PersonaRegistry) -> None:
     personas = persona_registry.load_all()
     assert set(personas) == {
         "planner", "implementer", "reviewer", "tester",
-        "gemini-implementer", "gemini-planner",
+        "agy-implementer", "agy-planner",
     }
     assert personas["planner"].cli == "claude"
     assert personas["implementer"].cli == "codex"
 
 
-def test_gemini_personas_bundled(persona_registry: PersonaRegistry) -> None:
+def test_agy_personas_bundled(persona_registry: PersonaRegistry) -> None:
     personas = persona_registry.load_all()
-    assert personas["gemini-implementer"].cli == "gemini"
-    assert personas["gemini-planner"].cli == "gemini"
+    assert personas["agy-implementer"].cli == "agy"
+    assert personas["agy-planner"].cli == "agy"
 
 
 def test_list_personas_sorted(persona_registry: PersonaRegistry) -> None:

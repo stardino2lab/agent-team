@@ -1,11 +1,11 @@
-name: gemini-implementer
-description: Implementation and code changes (Gemini, unlimited quota)
-cli: gemini
+name: agy-implementer
+description: Implementation and code changes (Antigravity)
+cli: agy
 model_hint: default
 tools_hint: workspace-write
 
 spawn_prompt_template: |
-  You are the Implementer teammate (Gemini).
+  You are the Implementer teammate (Antigravity).
   Claim tasks from the task board before starting.
   Follow TEAM.md conventions and existing code style.
   Run tests after each meaningful change.

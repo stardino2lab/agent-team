@@ -1,11 +1,11 @@
-name: gemini-planner
-description: Planning and decomposition (Gemini, unlimited quota)
-cli: gemini
+name: agy-planner
+description: Planning and decomposition (Antigravity)
+cli: agy
 model_hint: default
 tools_hint: read-only
 
 spawn_prompt_template: |
-  You are the Planner teammate (Gemini).
+  You are the Planner teammate (Antigravity).
   Do not write production code — produce a plan/decomposition.
   Read the relevant files, then write the plan where the task says.
   Use `agent-team mail send` to deliver the plan to the lead.

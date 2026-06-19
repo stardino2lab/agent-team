@@ -151,7 +151,7 @@ def test_spawn_mock_uses_safe_command_skips_send_keys_and_no_agents_md(
 
 @pytest.mark.parametrize(
     "persona,expected_cli",
-    [("planner", "claude"), ("implementer", "codex"), ("gemini-implementer", "gemini")],
+    [("planner", "claude"), ("implementer", "codex"), ("agy-implementer", "agy")],
 )
 def test_spawn_passes_persona_cli_to_split_pane(
     runner: TeammateRunner,
@@ -299,7 +299,7 @@ def test_spawn_codex_applies_bypass_launch_args(
     assert "--dangerously-bypass-approvals-and-sandbox" in joined
 
 
-def test_spawn_gemini_applies_interactive_auto_approve_args(
+def test_spawn_agy_applies_interactive_auto_approve_args(
     runner: TeammateRunner,
     psmux_backend: PsmuxBackend,
     tmp_path: Path,
@@ -313,21 +313,19 @@ def test_spawn_gemini_applies_interactive_auto_approve_args(
         **_spawn_kwargs(
             session_dir=session_dir,
             project_path=project,
-            teammate_name="helper-gem",
-            persona="gemini-implementer",
+            teammate_name="helper-agy",
+            persona="agy-implementer",
         )
     )
     split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
     joined = " ".join(split.args)
-    assert "gemini" in joined
-    assert "--approval-mode" in joined
-    assert "yolo" in joined
-    assert "--skip-trust" in joined
-    # Interactive, not headless: neither -p nor --prompt in the launch command
-    # (both are gemini's headless single-shot mode, which would exit before the
-    # kickoff). Two checks: ` -p ` catches the short flag; `--prompt` the long one.
+    assert "agy" in joined
+    assert "--dangerously-skip-permissions" in joined
+    # Interactive, not headless: neither -p nor --print in the launch command
+    # (both are agy's headless single-shot mode, which would exit before the
+    # kickoff). ` -p ` catches the short flag; `--print` the long one.
     assert " -p " not in f" {joined} "
-    assert "--prompt" not in joined
+    assert "--print" not in joined
 
 
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:
