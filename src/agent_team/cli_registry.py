@@ -5,7 +5,7 @@ of truth for which CLIs the orchestrator recognises and what each one can do.
 
 Currently registered: claude (lead + teammate), codex (lead + teammate),
 agy (Antigravity, teammate only — lead deferred: agy has no MCP subcommand,
-so it cannot yet host the agent-team MCP server). gemini was superseded by agy.
+so it cannot yet host the agent-team MCP server).
 """
 
 from __future__ import annotations
