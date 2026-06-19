@@ -334,6 +334,63 @@ def test_spawn_agy_applies_interactive_auto_approve_args(
     assert "--prompt-interactive" not in joined
 
 
+def test_spawn_codex_submits_kickoff_with_tab_enter(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="cdx-1",
+            persona="implementer",  # cli: codex
+        )
+    )
+    # The submit keypress is the send-keys call WITHOUT -l (named keys, not text).
+    submits = [
+        c
+        for c in psmux_backend.recorded_calls
+        if "send-keys" in c.args and "-l" not in c.args
+    ]
+    assert submits, "no submit send-keys recorded"
+    # codex needs Tab then Enter — Enter alone leaves the kickoff unsubmitted.
+    assert submits[-1].args[-2:] == ["Tab", "Enter"]
+
+
+def test_spawn_claude_submits_kickoff_with_enter_only(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="cl-1",
+            persona="planner",  # cli: claude
+        )
+    )
+    submits = [
+        c
+        for c in psmux_backend.recorded_calls
+        if "send-keys" in c.args and "-l" not in c.args
+    ]
+    assert submits, "no submit send-keys recorded"
+    assert submits[-1].args[-1] == "Enter"
+    assert "Tab" not in submits[-1].args
+
+
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:
     project = tmp_path / "proj"
     project.mkdir()

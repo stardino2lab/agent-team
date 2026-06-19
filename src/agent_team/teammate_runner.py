@@ -150,8 +150,8 @@ class TeammateRunner:
             )
             # D12: per-CLI launch args from the registry (e.g. codex non-interactive
             # approval/sandbox bypass). Read by the RUNNER, never named by the lead.
-            launch_args = get_cli_spec(p.cli).teammate_launch_args
-            command = " ".join([p.cli, *launch_args])
+            spec = get_cli_spec(p.cli)
+            command = " ".join([p.cli, *spec.teammate_launch_args])
             # Run the teammate CLI from the project root so relative file edits,
             # pytest, and git target the real checkout.
             pane_id = self.psmux.split_pane(
@@ -170,9 +170,13 @@ class TeammateRunner:
                 max_wait=_READY_MAX_WAIT_S,
                 settle_count=_READY_SETTLE_COUNT,
             )
-            # Trigger with a single-line kickoff pointing at the absolute brief path.
+            # Trigger with a single-line kickoff pointing at the absolute brief
+            # path. Submit keys are per-CLI (codex needs Tab+Enter; Enter alone
+            # leaves the composer unsubmitted and the teammate never starts).
             self.psmux.send_keys(
-                pane_id, _kickoff_line(teammate_name, brief_path.resolve())
+                pane_id,
+                _kickoff_line(teammate_name, brief_path.resolve()),
+                submit_keys=spec.teammate_submit_keys,
             )
 
         self.recorded_spawns.append(
