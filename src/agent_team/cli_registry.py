@@ -4,9 +4,8 @@ Leaf module — does NOT import other agent_team modules. Owns the single source
 of truth for which CLIs the orchestrator recognises and what each one can do.
 
 Currently registered: claude (lead + teammate), codex (lead + teammate),
-gemini (teammate only — lead is S12b, after its G0-G6 gates pass).
-antigravity (agy) is intentionally NOT registered: no MCP subcommand, so it
-cannot be an MCP lead/teammate; deferred.
+agy (Antigravity, teammate only — lead deferred: agy has no MCP subcommand,
+so it cannot yet host the agent-team MCP server). gemini was superseded by agy.
 """
 
 from __future__ import annotations
@@ -67,20 +66,20 @@ _REGISTRY: dict[str, CliSpec] = {
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
         mcp_format="toml",
     ),
-    "gemini": CliSpec(
-        name="gemini",
-        supports_lead=False,  # S12b promotes to lead after G0-G6 pass
+    "agy": CliSpec(
+        name="agy",
+        supports_lead=False,  # lead deferred: agy has no MCP subcommand
         supports_teammate=True,
         mcp_config_filename=None,
-        # D12-analog: gemini teammate runs INTERACTIVELY in its pane and gets the
-        # send_keys kickoff, so these are the interactive auto-approve flags (NOT
-        # -p, which is headless single-shot). yolo auto-approves all tools;
-        # skip-trust skips the workspace-trust prompt. Pending live G0/G1
-        # verification on this box — see tests/manual/s12-gemini-gates.md.
-        teammate_launch_args=("--approval-mode", "yolo", "--skip-trust"),
+        # agy is Claude-Code-derived: the teammate runs INTERACTIVELY in its pane
+        # and gets the send_keys kickoff, so this is the interactive auto-approve
+        # flag (NOT -p/--print, which is headless single-shot and would exit before
+        # the kickoff). One flag auto-approves all tool permission requests.
+        # Confirmed present in `agy --help`. Pending live G1 — see
+        # tests/manual/s12-agy-gates.md.
+        teammate_launch_args=("--dangerously-skip-permissions",),
         mcp_format=None,
     ),
-    # antigravity (agy): no MCP subcommand — not viable as lead/MCP-teammate; deferred.
 }
 
 

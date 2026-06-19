@@ -142,20 +142,21 @@ def test_claude_teammate_launch_args_empty() -> None:
     assert get_cli_spec("claude").teammate_launch_args == ()
 
 
-def test_gemini_registered_teammate_only() -> None:
-    spec = get_cli_spec("gemini")
+def test_agy_registered_teammate_only() -> None:
+    spec = get_cli_spec("agy")
     assert spec.supports_teammate is True
-    assert spec.supports_lead is False  # lead is S12b, after G0-G6
+    assert spec.supports_lead is False  # lead deferred: no MCP subcommand
     assert spec.mcp_config_filename is None
     assert spec.mcp_format is None  # teammate-only needs no lead MCP format
-    assert is_teammate_supported("gemini") is True
-    assert is_lead_supported("gemini") is False
+    assert is_teammate_supported("agy") is True
+    assert is_lead_supported("agy") is False
 
 
-def test_gemini_teammate_launch_args_are_interactive_auto_approve() -> None:
-    spec = get_cli_spec("gemini")
+def test_agy_teammate_launch_args_are_interactive_auto_approve() -> None:
+    spec = get_cli_spec("agy")
     # INTERACTIVE auto-approve (the teammate runs in a pane + receives the
-    # send_keys kickoff) — NOT -p/--prompt (that is headless single-shot).
-    assert spec.teammate_launch_args == ("--approval-mode", "yolo", "--skip-trust")
+    # send_keys kickoff) — NOT -p/--print (that is headless single-shot).
+    # agy is Claude-Code-derived: one flag covers all tool approvals.
+    assert spec.teammate_launch_args == ("--dangerously-skip-permissions",)
     assert "-p" not in spec.teammate_launch_args
-    assert "--prompt" not in spec.teammate_launch_args
+    assert "--print" not in spec.teammate_launch_args
