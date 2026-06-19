@@ -171,6 +171,13 @@ New module `src/agent_team/terminal_backend.py`:
   one place.** Repoint the 3–4 construction sites (`cli/start.py`,
   `cli/attach.py`, `mcp_server.py`) to the factory — still psmux on win32, so
   **byte-identical on Windows**.
+- **Fold in submit-keys platform defaulting here.** `CliSpec.teammate_submit_keys`
+  (codex `("Tab","Enter")` is Linux-observed; Windows TBD per
+  `tests/manual/s11b-teammate-hardening.md` §D11b) is currently env-overridable via
+  `AGENT_TEAM_SUBMIT_KEYS_<CLI>` with no `sys.platform` branch. When the factory
+  lands `sys.platform` selection, make the codex submit-keys default
+  platform-conditional in the same one place (env still wins), so Linux no longer
+  needs the env var.
 
 Seal the abstraction leaks (all behavior-preserving on Windows):
 

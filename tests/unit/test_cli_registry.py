@@ -12,6 +12,7 @@ from agent_team.cli_registry import (
     get_cli_spec,
     is_lead_supported,
     is_teammate_supported,
+    resolve_teammate_submit_keys,
 )
 
 
@@ -153,6 +154,42 @@ def test_default_teammate_submit_keys_are_enter() -> None:
     # claude / agy (Claude-Code-derived) submit on Enter alone — the default.
     assert get_cli_spec("claude").teammate_submit_keys == ("Enter",)
     assert get_cli_spec("agy").teammate_submit_keys == ("Enter",)
+
+
+def test_resolve_submit_keys_uses_registry_default_without_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", raising=False)
+    monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", raising=False)
+    assert resolve_teammate_submit_keys("codex") == ("Tab", "Enter")
+    assert resolve_teammate_submit_keys("claude") == ("Enter",)
+
+
+def test_resolve_submit_keys_env_override_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Per-platform/per-version override without a code change (e.g. if Windows
+    # codex submits on Enter alone but the registry default is the Linux value).
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "Enter")
+    assert resolve_teammate_submit_keys("codex") == ("Enter",)
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", "Tab Enter")
+    assert resolve_teammate_submit_keys("claude") == ("Tab", "Enter")
+
+
+def test_resolve_submit_keys_env_splits_on_whitespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "  Tab   Enter  ")
+    assert resolve_teammate_submit_keys("codex") == ("Tab", "Enter")
+
+
+def test_resolve_submit_keys_empty_env_means_no_submit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Set-but-empty is an explicit "type without submitting" (the runner sends
+    # no submit keypress) — distinct from unset (use the registry default).
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "")
+    assert resolve_teammate_submit_keys("codex") == ()
 
 
 def test_agy_registered_teammate_only() -> None:

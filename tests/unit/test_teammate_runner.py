@@ -391,6 +391,37 @@ def test_spawn_claude_submits_kickoff_with_enter_only(
     assert "Tab" not in submits[-1].args
 
 
+def test_spawn_submit_keys_env_override_reaches_pane(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    # Override claude's default (Enter) via env — proves the runner resolves
+    # submit keys through resolve_teammate_submit_keys, not the raw spec field.
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", "Tab Enter")
+
+    runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="ovr-1",
+            persona="planner",  # cli: claude
+        )
+    )
+    submits = [
+        c
+        for c in psmux_backend.recorded_calls
+        if "send-keys" in c.args and "-l" not in c.args
+    ]
+    assert submits, "no submit send-keys recorded"
+    assert submits[-1].args[-2:] == ["Tab", "Enter"]
+
+
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:
     project = tmp_path / "proj"
     project.mkdir()

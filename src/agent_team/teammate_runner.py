@@ -8,7 +8,7 @@ from pathlib import Path
 
 from agent_team._io import format_ts, utc_now
 from agent_team.bundled_paths import render_bundled_template
-from agent_team.cli_registry import get_cli_spec
+from agent_team.cli_registry import get_cli_spec, resolve_teammate_submit_keys
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
 
@@ -171,12 +171,14 @@ class TeammateRunner:
                 settle_count=_READY_SETTLE_COUNT,
             )
             # Trigger with a single-line kickoff pointing at the absolute brief
-            # path. Submit keys are per-CLI (codex needs Tab+Enter; Enter alone
-            # leaves the composer unsubmitted and the teammate never starts).
+            # path. Submit keys are per-CLI and env-overridable (codex needs
+            # Tab+Enter; Enter alone leaves the composer unsubmitted and the
+            # teammate never starts). AGENT_TEAM_SUBMIT_KEYS_<CLI> tunes it per
+            # platform/version without a code change.
             self.psmux.send_keys(
                 pane_id,
                 _kickoff_line(teammate_name, brief_path.resolve()),
-                submit_keys=spec.teammate_submit_keys,
+                submit_keys=resolve_teammate_submit_keys(p.cli),
             )
 
         self.recorded_spawns.append(
