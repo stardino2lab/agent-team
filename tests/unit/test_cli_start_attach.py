@@ -90,7 +90,7 @@ def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
 
     monkeypatch.setattr(PsmuxBackend, "split_pane", fake_split_pane)
 
-    def fake_send_keys(self, target, keys, *, enter=True):  # type: ignore[no-untyped-def]
+    def fake_send_keys(self, target, keys, *, submit_keys=("Enter",)):  # type: ignore[no-untyped-def]
         recorded.append(["send-keys", "-t", target, "-l", keys])
 
     monkeypatch.setattr(PsmuxBackend, "send_keys", fake_send_keys)

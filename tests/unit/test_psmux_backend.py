@@ -54,7 +54,7 @@ def test_mock_split_pane_horizontal_and_vertical(psmux_backend: PsmuxBackend) ->
 def test_mock_send_keys_with_and_without_enter(psmux_backend: PsmuxBackend) -> None:
     psmux_backend.new_session("sess")
     psmux_backend.send_keys("%0", "hello")
-    psmux_backend.send_keys("%0", "-flag", enter=False)
+    psmux_backend.send_keys("%0", "-flag", submit_keys=())
     # enter=True must emit the literal keys and the Enter keypress as TWO
     # separate send-keys calls — a single `-l ... Enter` would type the word
     # "Enter" literally instead of submitting the line.
@@ -78,6 +78,43 @@ def test_mock_send_keys_with_and_without_enter(psmux_backend: PsmuxBackend) -> N
         "-l",
         "-flag",
     ]
+
+
+def test_send_keys_submits_multi_key_sequence(psmux_backend: PsmuxBackend) -> None:
+    psmux_backend.new_session("sess")
+    # codex needs Tab then Enter to submit — the submit keys are NAMED keys
+    # (no -l), emitted as one send-keys call after the literal text.
+    psmux_backend.send_keys("%0", "go", submit_keys=("Tab", "Enter"))
+    assert psmux_backend.recorded_calls[1].args == [
+        "send-keys",
+        "-t",
+        "%0",
+        "-l",
+        "go",
+    ]
+    assert psmux_backend.recorded_calls[2].args == [
+        "send-keys",
+        "-t",
+        "%0",
+        "Tab",
+        "Enter",
+    ]
+
+
+def test_send_keys_empty_submit_keys_types_without_submitting(
+    psmux_backend: PsmuxBackend,
+) -> None:
+    psmux_backend.new_session("sess")
+    psmux_backend.send_keys("%0", "-flag", submit_keys=())
+    # Only the literal-type call; no submit keypress.
+    assert psmux_backend.recorded_calls[1].args == [
+        "send-keys",
+        "-t",
+        "%0",
+        "-l",
+        "-flag",
+    ]
+    assert len(psmux_backend.recorded_calls) == 2
 
 
 def test_mock_kill_pane_removes_from_list(psmux_backend: PsmuxBackend) -> None:

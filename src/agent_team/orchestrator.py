@@ -344,7 +344,7 @@ class Orchestrator:
                         output_last_message=self.ctx.session_dir / "lead-last.txt",
                     )
                 lead_pane = self.ctx.psmux.new_session(psmux_session, cwd=project_path)
-                self.ctx.psmux.send_keys(lead_pane, launch_cmd, enter=True)
+                self.ctx.psmux.send_keys(lead_pane, launch_cmd)
                 # CLI entry (not `python -m agent_team.tui`) so the session id
                 # flows through argv. The module entry needs AGENT_TEAM_SESSION_ID,
                 # which psmux.split_pane has no way to inject.

@@ -172,7 +172,7 @@ class TeammateRunner:
             )
             # Trigger with a single-line kickoff pointing at the absolute brief path.
             self.psmux.send_keys(
-                pane_id, _kickoff_line(teammate_name, brief_path.resolve()), enter=True
+                pane_id, _kickoff_line(teammate_name, brief_path.resolve())
             )
 
         self.recorded_spawns.append(

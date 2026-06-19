@@ -144,15 +144,19 @@ class PsmuxBackend:
             )
         return new_ids.pop()
 
-    def send_keys(self, target: str, keys: str, *, enter: bool = True) -> None:
+    def send_keys(
+        self, target: str, keys: str, *, submit_keys: tuple[str, ...] = ("Enter",)
+    ) -> None:
         safe_target = self._validate_target(target)
-        # `-l` sends keys literally (no key-name lookup). Enter MUST be a
-        # separate send-keys call WITHOUT -l, otherwise tmux types the literal
-        # string "Enter" instead of pressing the Enter key and the command line
-        # never executes (the lead `claude` launch silently fails as a result).
+        # `-l` sends keys literally (no key-name lookup). The SUBMIT keys MUST be
+        # a separate send-keys call WITHOUT -l, otherwise tmux types them as a
+        # literal string (e.g. "Enter") instead of pressing the keys and the
+        # command line never executes (the lead `claude` launch silently fails
+        # as a result). submit_keys are NAMED keys: ("Enter",) for most CLIs,
+        # ("Tab", "Enter") for codex's composer. Empty () types without submitting.
         self._run(["send-keys", "-t", safe_target, "-l", keys])
-        if enter:
-            self._run(["send-keys", "-t", safe_target, "Enter"])
+        if submit_keys:
+            self._run(["send-keys", "-t", safe_target, *submit_keys])
 
     def kill_pane(self, target: str) -> None:
         safe_target = self._validate_target(target)
