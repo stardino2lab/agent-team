@@ -142,6 +142,19 @@ def test_claude_teammate_launch_args_empty() -> None:
     assert get_cli_spec("claude").teammate_launch_args == ()
 
 
+def test_codex_teammate_submit_keys_are_tab_enter() -> None:
+    # codex's TUI composer does NOT submit on Enter alone — a live e2e found the
+    # kickoff text sat unsubmitted (teammate never reached ready/mail). Direct
+    # testing confirmed Tab then Enter submits. Capitalized = tmux key names.
+    assert get_cli_spec("codex").teammate_submit_keys == ("Tab", "Enter")
+
+
+def test_default_teammate_submit_keys_are_enter() -> None:
+    # claude / agy (Claude-Code-derived) submit on Enter alone — the default.
+    assert get_cli_spec("claude").teammate_submit_keys == ("Enter",)
+    assert get_cli_spec("agy").teammate_submit_keys == ("Enter",)
+
+
 def test_agy_registered_teammate_only() -> None:
     spec = get_cli_spec("agy")
     assert spec.supports_teammate is True

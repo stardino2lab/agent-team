@@ -32,6 +32,12 @@ class CliSpec:
     # codex: run non-interactively (no per-command approval, no sandbox, no trust
     # prompt) so a teammate pane works hands-off. claude: none (bare launch).
     teammate_launch_args: tuple[str, ...] = ()
+    # Named keys the RUNNER presses to SUBMIT the teammate kickoff line after
+    # typing it. Default ("Enter",) submits on Enter (claude/agy). codex's TUI
+    # composer needs ("Tab", "Enter") — Enter alone does not submit (a live e2e
+    # found the kickoff sat unsubmitted, so the teammate never reached ready).
+    # Capitalized to match tmux key names (cf. the existing "Enter" usage).
+    teammate_submit_keys: tuple[str, ...] = ("Enter",)
     # How the lead MCP config is delivered: "json" (a file passed via
     # --mcp-config, claude) or "toml" (a CODEX_HOME profile loaded via --profile,
     # codex). Required for any lead-capable CLI.
@@ -70,6 +76,7 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_teammate=True,
         mcp_config_filename=None,
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
+        teammate_submit_keys=("Tab", "Enter"),
         mcp_format="toml",
     ),
     "agy": CliSpec(
