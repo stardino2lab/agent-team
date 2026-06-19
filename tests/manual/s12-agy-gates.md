@@ -14,6 +14,13 @@ agy 1.0.10.
 - [ ] G1 (teammate): an INTERACTIVE `agy --dangerously-skip-permissions` pane accepts
       a kickoff via psmux send_keys and runs tool calls WITHOUT per-command approval
       or a first-run trust prompt. [token]
+      WATCH: agy has NO separate `--skip-trust` flag (gemini did) — the assumption is
+      that `--dangerously-skip-permissions` also clears the Claude-Code first-run
+      "trust this folder" prompt. If it does NOT, the pane blocks on a trust modal and
+      the kickoff lands on the modal, not the input line (silent hang — `_wait_until_
+      input_ready` settles on any stable non-empty output, incl. a modal). Confirm the
+      pane is at the prompt, not a trust dialog, when the kickoff fires. If it hangs,
+      remedy = pre-seed per-folder trust or add a trust-bypass flag to teammate_launch_args.
 - [ ] Helper-under-agy (teammate): confirm the `agent-team` shell helper (mail/task/
       `teammate ready`) runs under agy on Windows (the teammate brief tells it to). [token]
 

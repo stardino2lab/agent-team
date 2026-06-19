@@ -25,7 +25,7 @@
 | S9 | 완료 | Claude 리드 통합 — 수동 스모크 통과 (2026-06-14) |
 | S10 | 완료 | payment-api 실토큰 E2E 통과 (2026-06-15) |
 | S11 | 예정 | 멀티-CLI: codex 2nd lead + $20-lead 토큰/관측 하드닝 |
-| S12 | 예정 | Gemini/Antigravity (G0–G6 검증 게이트 통과 후) |
+| S12 | 진행 | agy/Antigravity 팀원(S12a) code-complete, G0 PASS — G1 토큰 게이트 잔여; 리드 보류(MCP 스파이크) |
 
 **테스트:** 216 passed (`pytest tests/ -q`)
 
@@ -48,7 +48,7 @@
 | S9 | 완료 | 실제 Claude 리드 부트스트랩 (MCP config + `--strict-mcp-config` 격리) — 수동 스모크 통과 | `orchestrator._build_lead_launch_command`, `cli_registry.py`, `bundled_paths.py` |
 | S10 | 완료 | payment-api 실토큰 E2E: 이기종 팀(claude+codex), 실제 `teammate_ready` 핸드셰이크, 팀원 brief/cwd | `teammate_runner.spawn`, `cli/teammate.py`(ready marker), `tests/fixtures/payment-api/` |
 | S11 | 예정 | codex 2nd lead + 토큰/관측 하드닝 (D6 preamble, D8 event-driven, D9 bounded reads, D10 transcript, D11/D12 codex 팀원 비대화형) | [s11-multi-cli-plan.md](s11-multi-cli-plan.md) |
-| S12 | 예정 | Gemini/Antigravity 팀원→리드 (검증 게이트 G0–G6) | 동상 |
+| S12 | 진행 | agy/Antigravity 팀원(S12a code-complete)→리드(보류, MCP 스파이크) | 동상 |
 
 ---
 
@@ -57,7 +57,7 @@
 1. **S11a — $20-lead 하드닝 (최우선, ROI 최고):** D6 orchestration-only preamble + D8 event-driven wait(폴링 제거) + D9 bounded/filtered reads. S10 토큰 리뷰의 직접 결과물.
 2. **S11b — 관측/신뢰성:** D10 팀원 transcript 캡처 + D11 kickoff input-readiness + D12 codex 팀원 비대화형(승인/샌드박스) launch.
 3. **S11c — codex 2nd lead:** D1/D2(per-CLI lead dispatch + JSON/TOML MCP 렌더러) + D3 + D4(config 기반 역할 배정, `lead_cli` 플립).
-4. **S12 (병렬 spike 가능):** Gemini/Antigravity 설치 + G0–G6 검증 → S12a 팀원 → S12b 리드.
+4. **S12 (agy/Antigravity):** S12a 팀원 code-complete(gemini 치환), G0 PASS, G1+helper 토큰 게이트 잔여 → 리드는 MCP 스파이크 후(S12b).
 
 상세 계획·결정(D1~D12)·검증 게이트는 [s11-multi-cli-plan.md](s11-multi-cli-plan.md) 참조.
 

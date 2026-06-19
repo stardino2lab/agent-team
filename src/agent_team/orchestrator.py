@@ -115,7 +115,7 @@ def _check_lead_cli_supported(cli: str) -> None:
     if not is_lead_supported(cli):
         raise LeadCliNotSupportedError(
             f"Lead CLI {cli!r} not supported yet "
-            f"(antigravity/agy planned for S12+)"
+            f"(agy/Antigravity lead planned for S12+)"
         )
 
 
@@ -211,10 +211,10 @@ def _build_lead_launch_command(
             ]
         )
     # Defensive: a registered lead CLI without an arm is a registry/builder
-    # mismatch. antigravity/agy land here until S12 adds their arm.
+    # mismatch. agy/Antigravity lands here until S12 adds its lead arm.
     raise LeadCliNotSupportedError(
         f"Lead CLI {cli!r} is registered but has no launch builder "
-        f"(antigravity/agy planned for S12+)"
+        f"(agy/Antigravity lead planned for S12+)"
     )
 
 

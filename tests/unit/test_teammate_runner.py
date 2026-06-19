@@ -326,6 +326,12 @@ def test_spawn_agy_applies_interactive_auto_approve_args(
     # kickoff). ` -p ` catches the short flag; `--print` the long one.
     assert " -p " not in f" {joined} "
     assert "--print" not in joined
+    # agy is Claude-Code-derived; guard the two flags most likely to be
+    # reintroduced by accident: --sandbox would restrict the teammate (it needs
+    # full workspace access), and --prompt-interactive is the other headless-ish
+    # entry point that should not carry the kickoff (send_keys does).
+    assert "--sandbox" not in joined
+    assert "--prompt-interactive" not in joined
 
 
 def test_spawn_unknown_persona_raises(runner: TeammateRunner, tmp_path: Path) -> None:

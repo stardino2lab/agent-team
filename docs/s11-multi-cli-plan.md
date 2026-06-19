@@ -263,6 +263,15 @@ Run this as a parallel spike, **off the S10/S11 critical path**.
 
 ## S12 — Gemini/Antigravity (committed milestone)
 
+> **SUPERSEDED (2026-06-19):** S12 was redirected from the **gemini CLI** to the
+> **agy (Antigravity) CLI** (user directive). S12a shipped agy as a teammate-only
+> CLI — see `docs/superpowers/specs/2026-06-19-s12a-agy-teammate-design.md` and
+> `docs/superpowers/plans/2026-06-19-s12a-agy-teammate.md`. The gemini-specific
+> sub-sections below (registry entry, `cli: gemini` personas, `--approval-mode
+> yolo --skip-trust`, the G0–G6 gates) are **historical** — the live gate doc is
+> now `tests/manual/s12-agy-gates.md`, and the agy lead is deferred to an MCP
+> spike (agy has no `mcp` subcommand), not a clean G0–G6 sequence.
+
 Gemini is the end-goal workhorse — unlimited quota on the heaviest role (coding
 teammates) is the biggest cost win. It is scheduled as its own milestone (not an
 open-ended defer) because it has a real, separable prerequisite: it is **not

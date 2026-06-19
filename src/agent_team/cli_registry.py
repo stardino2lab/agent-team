@@ -50,6 +50,12 @@ class CliSpec:
             raise ValueError(f"{self.name}: must support at least one role")
 
 
+# NOTE: the Antigravity CLI is keyed by its binary name `agy` (consistent with
+# claude/codex — registry key == launch command). Do NOT register the key
+# "antigravity": several tests use that exact string as the canonical
+# "unregistered / unsupported" stand-in (e.g. test_antigravity_is_not_registered,
+# test_orchestrator bad_cli params). Registering it would silently flip those
+# negative tests from asserting rejection to asserting acceptance.
 _REGISTRY: dict[str, CliSpec] = {
     "claude": CliSpec(
         name="claude",
