@@ -43,7 +43,7 @@ def test_codex_is_lead_and_teammate() -> None:
     assert spec.supports_lead is True
     assert spec.supports_teammate is True
     assert spec.mcp_format == "toml"
-    # codex uses a CODEX_HOME profile, not a session-dir file.
+    # codex delivers MCP inline via `-c` overrides, not a session-dir file.
     assert spec.mcp_config_filename is None
 
 
@@ -101,7 +101,7 @@ def test_codex_is_lead_capable_with_toml_format() -> None:
     codex = get_cli_spec("codex")
     assert codex.supports_lead is True
     assert codex.mcp_format == "toml"
-    # codex uses a CODEX_HOME profile, not a session-dir file.
+    # codex delivers MCP inline via `-c` overrides, not a session-dir file.
     assert codex.mcp_config_filename is None
     assert is_lead_supported("codex") is True
 
@@ -132,8 +132,30 @@ def test_codex_teammate_launch_args_bypass() -> None:
 
     codex = get_cli_spec("codex")
     # D12: codex teammate runs hands-off (no per-command approval / sandbox /
-    # trust prompts) — applied by the runner, never named by the lead.
-    assert codex.teammate_launch_args == ("--dangerously-bypass-approvals-and-sandbox",)
+    # trust prompts) — applied by the runner, never named by the lead. Exact-tuple
+    # equality pins the COMPLETE launch-arg set (presence + order, no dup/stray arg);
+    # the S14 update-nag pair is also asserted on its own below for intent.
+    assert codex.teammate_launch_args == (
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "check_for_update_on_startup=false",
+    )
+
+
+def test_codex_teammate_launch_args_suppress_update_nag() -> None:
+    from agent_team.cli_registry import get_cli_spec
+
+    codex = get_cli_spec("codex")
+    # S14 hardening: suppress codex's INTERACTIVE startup update-nag ("✨ Update
+    # available! → 1. Update now"). Pre-fix, the readiness wait settled on the nag
+    # and the kickoff Enter selected "Update now" → codex ran npm self-update and
+    # the pane terminated with no teammate_ready (s11b §D11b Step B). A per-launch
+    # `-c key=value` override (highest precedence over config.toml, parsed as a TOML
+    # bool, no global file mutation) turns the startup check off at the root.
+    assert codex.teammate_launch_args[-2:] == (
+        "-c",
+        "check_for_update_on_startup=false",
+    )
 
 
 def test_claude_teammate_launch_args_empty() -> None:

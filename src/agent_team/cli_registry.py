@@ -78,7 +78,23 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_lead=True,
         supports_teammate=True,
         mcp_config_filename=None,
-        teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
+        # 1st flag (D12): run hands-off (no per-command approval / sandbox / trust).
+        # `-c check_for_update_on_startup=false` (S14 hardening): suppress codex's
+        # INTERACTIVE startup update-nag. Pre-fix, when a new codex version was
+        # available the pane dropped into "✨ Update available! → 1. Update now /
+        # Press enter to continue"; the readiness wait settled on it and the kickoff
+        # Enter selected "Update now", so codex ran `npm install -g @openai/codex`,
+        # updated, and the pane TERMINATED with no teammate_ready — killing the first
+        # spawn after every codex version bump (s11b §D11b Step B). `-c key=value` is
+        # a per-launch config override (highest precedence over ~/.codex/config.toml,
+        # parsed as a TOML bool) so the startup update check is off at the root with
+        # NO global file mutation. NOTE: codex's first-run TRUST prompt on a fresh
+        # folder is a separate non-composer prompt, tracked in D12 — not this flag.
+        teammate_launch_args=(
+            "--dangerously-bypass-approvals-and-sandbox",
+            "-c",
+            "check_for_update_on_startup=false",
+        ),
         # submit keys: default ("Enter",) — Windows codex submits on Enter alone
         # (verified). Linux needs Tab+Enter via AGENT_TEAM_SUBMIT_KEYS_CODEX.
         mcp_format="toml",

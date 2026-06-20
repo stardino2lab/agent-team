@@ -297,6 +297,10 @@ def test_spawn_codex_applies_bypass_launch_args(
     # D12: codex teammate launched non-interactively, args from the registry.
     assert "codex" in joined
     assert "--dangerously-bypass-approvals-and-sandbox" in joined
+    # S14 hardening: the per-launch override that suppresses codex's startup
+    # update-nag reaches the pane launch command (s11b §D11b Step B). Without it the
+    # first spawn after a codex version bump self-updates and the pane dies.
+    assert "-c check_for_update_on_startup=false" in joined
 
 
 def test_spawn_agy_applies_interactive_auto_approve_args(

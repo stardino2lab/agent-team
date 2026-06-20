@@ -294,6 +294,16 @@ without violating the event-driven, no-polling-loop architecture
 (`project_loader.py` forbids lead/teammate `test -f` loops). A **user-invoked,
 one-shot** CLI command that reads files once and exits is allowed.
 
+> **S14 launch-robustness hardening (landed) — codex update-nag.** A Windows live
+> e2e found the first codex teammate spawn after a codex version bump dropped into
+> codex's interactive "✨ Update available! → 1. Update now" prompt; the readiness
+> wait settled on it and the kickoff Enter selected "Update now", so codex
+> self-updated and the pane terminated with no `teammate_ready`
+> (`tests/manual/s11b-teammate-hardening.md` §D11b Step B). Fixed by launching codex
+> teammates with `-c check_for_update_on_startup=false` (per-launch config override
+> in the codex `teammate_launch_args`; no global config.toml mutation). Unit-covered;
+> live recheck gated for the next codex version bump (s11b §D11b Step B-recheck).
+
 ### S14a — Health model + `agent-team status`
 
 New `src/agent_team/health.py` (pure, read-only, injectable deps): `derive_health`

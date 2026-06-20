@@ -77,6 +77,34 @@ Full live e2e run on Windows 2026-06-20 (claude lead + agent-team MCP + TUI appr
 > was found in `codex --help` or `~/.codex/config.toml`. FIX (follow-up): suppress
 > codex's update check on teammate launch, or have the readiness/kickoff dismiss a
 > non-composer startup prompt before sending Enter. Tracked for S14 hardening.
+>
+> **RESOLVED (S14 hardening, code) — config override suppresses the nag at the root.**
+> codex DOES support a config key `check_for_update_on_startup` (default `true`;
+> OpenAI config reference; GitHub openai/codex #3855/#4375). The earlier "no toggle"
+> finding was a key-name miss, not absence. The runner now launches codex teammates
+> with `-c check_for_update_on_startup=false` (added to the registry's codex
+> `teammate_launch_args`). `-c key=value` is a per-launch config override — highest
+> precedence over `~/.codex/config.toml`, parsed as a TOML bool — so codex skips the
+> startup update check entirely and never shows the interactive nag. Chosen over the
+> global config.toml edit (no global mutation) and over screen-scraping the modal
+> (fragile; doesn't generalise). Unit-covered:
+> `test_codex_teammate_launch_args_suppress_update_nag` (cli_registry) +
+> `test_spawn_codex_applies_bypass_launch_args` (teammate_runner) assert the flag
+> reaches the pane launch command. Live recheck below.
+
+### Step B-recheck — codex update-nag suppression (run on the NEXT codex version bump)
+The argv seam is unit-covered; this confirms the live behavior the next time codex
+ships an update (the only condition that reproduces the nag).
+- [ ] Confirm an update is pending: a raw `codex` (no flags) shows "✨ Update
+      available!". (If none pending, the nag can't reproduce — note "n/a, codex current".)
+- [ ] Spawn a codex teammate via agent-team. Confirm the pane does NOT show the
+      update prompt, does NOT run `npm install -g @openai/codex`, reads its brief,
+      and reaches `teammate_ready` on the FIRST spawn (pre-fix the 1st spawn died).
+- [ ] `codex --version` BEFORE and AFTER the spawn are identical (the teammate launch
+      did not self-update codex).
+- [ ] Record codex version + outcome: ____________________
+- [ ] If a FUTURE codex ever rejects an unknown `-c` key (it tolerates them today),
+      the pane would fail to start — note that here and pin/rename the key.
 
 ### Step C — claude regression
 - [x] claude submits on Enter alone — **Windows: YES** (the lead pane itself: prompt
