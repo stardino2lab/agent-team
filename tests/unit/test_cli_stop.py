@@ -108,6 +108,98 @@ def test_block_writes_manifest_on_graceful_stop(
     assert (session_dir / "result_manifest.json").exists()
 
 
+# --- timeout + kill-panes (S18b2) -------------------------------------------
+
+
+def _orch_with_psmux(session_store: SessionStore, sid: str, psmux):
+    session_store.create(session_id=sid, project_path="c:\\p", psmux_session=f"{sid}-px")
+    session_dir = session_store.session_dir(sid)
+    return SimpleNamespace(
+        ctx=SimpleNamespace(
+            session_id=sid, session_dir=session_dir, event_log=EventLog(),
+            store=session_store, psmux=psmux,
+        ),
+        stop_watching=lambda: None,
+    ), session_dir
+
+
+def _killed_session(psmux) -> bool:
+    return any("kill-session" in c.args for c in psmux.recorded_calls)
+
+
+def test_timeout_emits_timeout_reason_and_kills_panes(
+    session_store: SessionStore,
+) -> None:
+    from agent_team.psmux_backend import PsmuxBackend
+
+    psmux = PsmuxBackend(mock=True)
+    orch, session_dir = _orch_with_psmux(session_store, "to", psmux)
+    block_until_stopped(
+        orch, "to", no_block=False, manifest=False, timeout=0.05, kill_panes=False
+    )
+    events = _stopped_events(session_dir)
+    assert len(events) == 1 and events[0].payload["reason"] == "timeout"
+    # A timeout is a safety backstop: it kills panes even without --autonomous.
+    assert _killed_session(psmux) is True
+
+
+def test_timeout_projects_to_final_timeout_manifest(
+    session_store: SessionStore,
+) -> None:
+    # End-to-end: a timeout emits orchestrator_stopped{timeout}, which the manifest
+    # projection reports as final=True + session_status="timeout" (the contract
+    # seam Hermes gates on).
+    from agent_team.manifest import load_manifest
+    from agent_team.psmux_backend import PsmuxBackend
+
+    orch, session_dir = _orch_with_psmux(session_store, "e2e", PsmuxBackend(mock=True))
+    block_until_stopped(
+        orch, "e2e", no_block=False, manifest=False, timeout=0.05, kill_panes=False
+    )
+    m = load_manifest(session_store.load("e2e"), session_dir)
+    assert m.final is True
+    assert m.session_status == "timeout"
+
+
+def test_autonomous_kills_panes_on_marker_stop(session_store: SessionStore) -> None:
+    from agent_team.psmux_backend import PsmuxBackend
+
+    psmux = PsmuxBackend(mock=True)
+    orch, session_dir = _orch_with_psmux(session_store, "au", psmux)
+    done = threading.Event()
+
+    def run() -> None:
+        block_until_stopped(orch, "au", no_block=False, manifest=False, kill_panes=True)
+        done.set()
+
+    t = threading.Thread(target=run)
+    t.start()
+    request_stop(session_dir)
+    assert done.wait(timeout=5)
+    t.join(timeout=5)
+    assert _killed_session(psmux) is True  # autonomous tears down on terminal stop
+
+
+def test_attended_marker_stop_does_not_kill_panes(session_store: SessionStore) -> None:
+    from agent_team.psmux_backend import PsmuxBackend
+
+    psmux = PsmuxBackend(mock=True)
+    orch, session_dir = _orch_with_psmux(session_store, "att", psmux)
+    done = threading.Event()
+
+    def run() -> None:
+        block_until_stopped(orch, "att", no_block=False, manifest=False, kill_panes=False)
+        done.set()
+
+    t = threading.Thread(target=run)
+    t.start()
+    request_stop(session_dir)
+    assert done.wait(timeout=5)
+    t.join(timeout=5)
+    # Attended stop preserves panes so the human can re-attach / inspect.
+    assert _killed_session(psmux) is False
+
+
 # --- stop command -----------------------------------------------------------
 
 

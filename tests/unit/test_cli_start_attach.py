@@ -49,6 +49,19 @@ def test_start_cli_dry_run_creates_session(
     assert not (session_store.session_dir("e2e-start") / "result_manifest.json").exists()
 
 
+def test_start_autonomous_requires_timeout(
+    cli_env: dict[str, str], consumer_project: Path
+) -> None:
+    result = CliRunner().invoke(
+        main,
+        ["start", "--project", str(consumer_project), "--session", "auto",
+         "--autonomous", "--no-psmux", "--no-block"],
+        env=cli_env,
+    )
+    assert result.exit_code == 1  # fails fast before spawning anything
+    assert "requires --timeout" in (result.output + (result.stderr or ""))
+
+
 def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
     cli_env: dict[str, str],
     minimal_project: Path,

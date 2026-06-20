@@ -25,12 +25,23 @@ S18b3 (signal-handler manifest + orphan-pane reaper) extend this doc as they lan
 - [ ] Backgrounded run: `agent-team start ... &` then `agent-team stop ...` →
       the backgrounded job ends cleanly (the Hermes "start, walk away, stop" loop).
 
-## Pending (S18b2 / S18b3 — land with those slices)
-- [ ] Mandatory `--timeout` in autonomous mode fires a terminal transition and
-      `kill_session`s every pane (no teammate keeps draining quota).
-- [ ] Terminal `orchestrator_stopped{reason}` ∈ {completed,timeout,stopped,error};
-      manifest carries `session_status` + a `final` boolean; Hermes acts only on
-      `final=true`.
+## S18b2 — timeout + terminal states + kill-all-panes (unit-covered; verify live)
+- [ ] `agent-team start ... --autonomous` WITHOUT `--timeout` → exits 1 fast
+      ("--autonomous requires --timeout"), no panes spawned.
+- [ ] `agent-team start ... --timeout 5` (no `--autonomous`) on a real session →
+      at ~5s the run emits `orchestrator_stopped{reason:"timeout"}`, kills every
+      pane (`git`/edits stop), exits 0. (Timeout always tears down — it's the
+      safety backstop, even attended.)
+- [ ] `agent-team start ... --autonomous --timeout <n>` → on ANY terminal stop
+      (timeout / `agent-team stop` / Ctrl-C) every pane is killed.
+- [ ] Attended `start` (no `--autonomous`, no `--timeout`) Ctrl-C → panes are NOT
+      killed (human can re-attach/inspect — unchanged behavior).
+- [ ] `agent-team logs manifest --session <id>` after a terminal stop →
+      `final: true` and `session_status` is the terminal reason
+      (timeout/stopped/user); while running → `final: false`, status `active`.
+      Confirm Hermes can gate on `final` (mid-run reads show `final:false`).
+
+## Pending (S18b3 — land with that slice)
 - [ ] Crash-safe terminal manifest from a signal handler (SIGTERM), not only the
       `finally`; a SIGKILL'd orchestrator still yields a valid manifest via
       `logs manifest` (pure projection).

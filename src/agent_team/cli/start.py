@@ -42,6 +42,20 @@ from agent_team.terminal_backend import make_terminal_backend
 @click.option("--dry-run", is_flag=True, help="TeammateRunner mock - no real CLI invocation")
 @click.option("--no-psmux", is_flag=True, help="Skip psmux pane creation (file + TUI only)")
 @click.option(
+    "--timeout",
+    "timeout_s",
+    type=float,
+    default=None,
+    help="Stop after N seconds (the primary liveness backstop). Kills all panes "
+    "on expiry. Required with --autonomous.",
+)
+@click.option(
+    "--autonomous",
+    is_flag=True,
+    help="Headless mode (no human at the TUI): --timeout is mandatory and every "
+    "pane is killed on terminal stop.",
+)
+@click.option(
     "--no-block",
     is_flag=True,
     hidden=True,
@@ -54,11 +68,18 @@ def start_cmd(
     context_text: str | None,
     dry_run: bool,
     no_psmux: bool,
+    timeout_s: float | None,
+    autonomous: bool,
     no_block: bool,
 ) -> None:
     """Start a new orchestrated session."""
     project = project.resolve()
     sid = session_id or project.name
+    # Fail fast BEFORE spawning any panes: autonomous mode has no human backstop,
+    # so a wall-clock timeout is mandatory (covers the ~6 hang paths the safety
+    # review found: unresolved approval, wait_for_event stall, dead teammate, ...).
+    if autonomous and timeout_s is None:
+        echo_error("--autonomous requires --timeout <seconds> (the liveness backstop).")
     store = SessionStore()
 
     try:
@@ -98,6 +119,10 @@ def start_cmd(
     )
 
     # Drop any stale stop marker from a prior run so this fresh start doesn't
-    # exit instantly; then block until Ctrl-C or `agent-team stop` (S18b1).
+    # exit instantly; then block until Ctrl-C, `agent-team stop`, or --timeout
+    # (S18b1/S18b2). Autonomous runs kill all panes on terminal stop.
     clear_stop(orch.ctx.session_dir)
-    block_until_stopped(orch, sid, no_block=no_block, manifest=True)
+    block_until_stopped(
+        orch, sid, no_block=no_block, manifest=True,
+        timeout=timeout_s, kill_panes=autonomous,
+    )

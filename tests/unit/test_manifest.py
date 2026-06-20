@@ -205,6 +205,28 @@ def test_escalations_and_members_in_envelope() -> None:
     assert m.members[0].cli == "codex"
 
 
+def test_final_and_session_status_terminal_aware() -> None:
+    # S18b2 completion contract: Hermes acts only on final=true; session_status
+    # reflects the terminal reason, not the raw "active".
+    s = _session([_member("lead", role="lead")])
+    live = _build(s, [], session_stopped=False)
+    assert live.final is False
+    assert live.session_status == "active"
+
+    ev = Event(type="orchestrator_stopped", ts="t", payload={"reason": "timeout"})
+    done = _build(s, [], events=[ev], session_stopped=True)
+    assert done.final is True
+    assert done.session_status == "timeout"
+
+
+def test_session_status_falls_back_to_stopped_without_reason() -> None:
+    # final but no orchestrator_stopped reason in events -> "stopped", never "active".
+    s = _session([_member("lead", role="lead")])
+    m = _build(s, [], session_stopped=True)
+    assert m.final is True
+    assert m.session_status == "stopped"
+
+
 def test_empty_session_projects_with_defaults() -> None:
     # Backward-compat: a session with no tasks/events/members still projects.
     s = _session([])

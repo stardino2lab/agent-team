@@ -31,7 +31,8 @@ from agent_team.tasks import Task
 # Unfrozen until a real Hermes consumer exists to validate the schema (S16e);
 # bumped when the field set changes. A pin test lands with S16e, like the
 # status --json field-set pin (test_status_json_field_set_pinned).
-MANIFEST_VERSION = 1
+# v2 (S18b2): added `final` + terminal-aware `session_status`.
+MANIFEST_VERSION = 2
 
 _ORCHESTRATOR_STOPPED = "orchestrator_stopped"
 _TASK_RESULT = "task_result"  # emitted by the deferred S16c hook; read if present
@@ -70,8 +71,14 @@ class ResultManifest:
     session_id: str
     project_path: str
     playbook: str | None
-    session_status: str  # raw Session.status (stays "active"; see session_stopped)
+    session_status: str  # terminal reason when final, else raw Session.status
     session_stopped: bool  # derived: an orchestrator_stopped event was recorded
+    # S18b2 completion contract: Hermes must act ONLY on final=true (else `logs
+    # manifest`, callable any time, would report in-progress tasks as the answer).
+    # Currently final == session_stopped, valid because autonomous mode kills all
+    # panes on stop and never re-attaches; if interactive re-attach is added,
+    # redefine as "latest lifecycle event is orchestrator_stopped, no later activity".
+    final: bool
     summary: str | None  # session_summary hook (S16c); null today
     members: list[ManifestMember]
     tasks: list[TaskRecord]
@@ -130,6 +137,7 @@ def build_manifest(
     # latest-wins per task. Absent today -> output/next_action/artifact_path null.
     task_results: dict[str, dict] = {}
     summary: str | None = None
+    terminal_reason: str | None = None  # latest orchestrator_stopped reason (S18b2)
     for ev in events:
         if ev.type == _TASK_RESULT:
             tid = ev.payload.get("task_id")
@@ -137,6 +145,8 @@ def build_manifest(
                 task_results[tid] = ev.payload
         elif ev.type == _SESSION_SUMMARY:
             summary = ev.payload.get("summary", summary)
+        elif ev.type == _ORCHESTRATOR_STOPPED:
+            terminal_reason = ev.payload.get("reason", terminal_reason)
 
     records: list[TaskRecord] = []
     for t in tasks:
@@ -180,13 +190,19 @@ def build_manifest(
     for r in records:
         counts[r.status] = counts.get(r.status, 0) + 1
 
+    # When final, surface the terminal reason (never the raw "active", which is the
+    # lie the completion contract kills); "stopped" is the safe generic fallback if
+    # a stop event lacks a reason.
+    session_status = (terminal_reason or "stopped") if session_stopped else session.status
+
     return ResultManifest(
         manifest_version=manifest_version,
         session_id=session.session_id,
         project_path=session.project_path,
         playbook=session.playbook,
-        session_status=session.status,
+        session_status=session_status,
         session_stopped=session_stopped,
+        final=session_stopped,
         summary=summary,
         members=[
             ManifestMember(
@@ -277,13 +293,13 @@ def _md_cell(value: str | None) -> str:
 
 
 def render_md(manifest: ResultManifest) -> str:
-    stopped = "  (stopped)" if manifest.session_stopped else ""
+    final = "  (final)" if manifest.final else ""
     lines = [
         f"# Session {manifest.session_id}",
         "",
         f"- project: {manifest.project_path}",
         f"- playbook: {manifest.playbook or '-'}",
-        f"- status: {manifest.session_status}{stopped}",
+        f"- status: {manifest.session_status}{final}",
     ]
     if manifest.summary:
         lines += ["", f"**Summary:** {_md_cell(manifest.summary)}"]
