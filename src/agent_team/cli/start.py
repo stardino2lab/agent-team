@@ -14,8 +14,9 @@ from agent_team.project_loader import (
     ProjectConfigError,
     TeamMdNotFoundError,
 )
-from agent_team.psmux_backend import PsmuxBackend, PsmuxNotFoundError
+from agent_team.psmux_backend import PsmuxNotFoundError
 from agent_team.session import SessionExistsError, SessionNotFoundError, SessionStore
+from agent_team.terminal_backend import make_terminal_backend
 
 
 @click.command("start")
@@ -65,7 +66,7 @@ def start_cmd(
         pass
 
     try:
-        psmux = PsmuxBackend(mock=no_psmux)
+        psmux = make_terminal_backend(mock=no_psmux)
     except PsmuxNotFoundError as exc:
         echo_error(str(exc))
 

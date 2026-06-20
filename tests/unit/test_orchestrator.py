@@ -612,6 +612,50 @@ def test_build_lead_launch_command_for_claude_includes_required_tokens(
     assert f'--append-system-prompt-file "{sysprompt}"' in line
 
 
+def test_build_lead_launch_command_claude_characterization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Byte-exact guard on the claude launch line (which monkeypatched).
+
+    Locks the EXACT quoting — double-quote wrap, native str(path) separators (NOT
+    forward-slashed). S13b routes this through quote_pane_arg and must keep this
+    byte-identical on Windows; this is the regression net for that rewire.
+    """
+    monkeypatch.setattr("agent_team.orchestrator.shutil.which", lambda n: f"/fake/{n}")
+    mcp = tmp_path / "claude-mcp.json"
+    sysprompt = tmp_path / "lead-system-prompt.md"
+    line = _build_lead_launch_command(
+        "claude", mcp_config=mcp, system_prompt_file=sysprompt
+    )
+    assert line == (
+        f'/fake/claude --mcp-config "{mcp}" --strict-mcp-config '
+        f'--append-system-prompt-file "{sysprompt}"'
+    )
+
+
+def test_build_lead_launch_command_codex_characterization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Byte-exact guard on the codex launch line (which monkeypatched)."""
+    from agent_team.orchestrator import _CODEX_LEAD_BOOTSTRAP
+
+    monkeypatch.setattr("agent_team.orchestrator.shutil.which", lambda n: f"/fake/{n}")
+    lead_dir = tmp_path / "session" / "lead"
+    last = tmp_path / "session" / "lead-last.txt"
+    line = _build_lead_launch_command(
+        "codex",
+        session_id="sid-9",
+        project_path=tmp_path / "proj",
+        lead_dir=lead_dir,
+        output_last_message=last,
+    )
+    assert line == (
+        f"/fake/codex exec --ignore-user-config --skip-git-repo-check "
+        f"--profile agent-team-sid-9 -C \"{lead_dir}\" -o \"{last}\" "
+        f'"{_CODEX_LEAD_BOOTSTRAP}"'
+    )
+
+
 def test_build_lead_launch_command_for_codex_includes_required_tokens(
     tmp_path: Path,
 ) -> None:

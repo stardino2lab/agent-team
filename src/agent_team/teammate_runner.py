@@ -10,7 +10,7 @@ from agent_team._io import format_ts, utc_now
 from agent_team.bundled_paths import render_bundled_template
 from agent_team.cli_registry import get_cli_spec, resolve_teammate_submit_keys
 from agent_team.personas import PersonaRegistry
-from agent_team.psmux_backend import PsmuxBackend
+from agent_team.terminal_backend import TerminalBackend
 
 _MOCK_COMMAND = 'python -c "print(\'dry-run teammate ready\')"'
 
@@ -105,7 +105,7 @@ class TeammateRunner:
 
     def __init__(
         self,
-        psmux: PsmuxBackend,
+        psmux: TerminalBackend,
         registry: PersonaRegistry,
         *,
         mock: bool = False,

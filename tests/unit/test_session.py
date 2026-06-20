@@ -62,6 +62,9 @@ def test_load_round_trip_members(session_store: SessionStore) -> None:
     assert len(loaded.members) == 2
     assert loaded.members[1].persona == "planner"
     assert loaded.members[1].pane_id == "%2"
+    # On-disk Member.backend persists the backend name verbatim (S13a: orchestrator
+    # now writes self.ctx.psmux.name, which is "psmux" on Windows — byte-identical).
+    assert loaded.members[0].backend == "psmux"
 
 
 def test_member_round_trips_request_id_and_defaults_none(

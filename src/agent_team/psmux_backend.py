@@ -1,55 +1,37 @@
-"""psmux subprocess wrapper for pane control."""
+"""psmux subprocess wrapper for pane control (the Windows TerminalBackend)."""
 
 from __future__ import annotations
 
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from agent_team._io import InvalidPathSegmentError, safe_segment
+from agent_team.terminal_backend import (
+    BackendCommandError,
+    BackendNotFoundError,
+    PaneInfo,
+    RecordedCall,
+)
 
 _PANE_TARGET = re.compile(r"%[0-9]+")
 _STDERR_MAX = 500
 
+# Neutral exceptions live in terminal_backend now; keep the psmux-named aliases so
+# existing `except PsmuxNotFoundError` / `except PsmuxCommandError` callers and
+# imports (cli/start, cli/attach, mcp_server) keep working unchanged.
+PsmuxNotFoundError = BackendNotFoundError
+PsmuxCommandError = BackendCommandError
 
-class PsmuxNotFoundError(FileNotFoundError):
-    """Raised when psmux executable is not in PATH."""
-
-
-class PsmuxCommandError(RuntimeError):
-    """Raised when a psmux command exits non-zero."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        exit_code: int,
-        command_args: list[str],
-        stderr: str,
-    ) -> None:
-        super().__init__(message)
-        self.exit_code = exit_code
-        self.command_args = command_args
-        self.stderr = stderr
-
-    @property
-    def args(self) -> list[str]:
-        """Alias for sketch compatibility."""
-        return self.command_args
-
-
-@dataclass
-class PaneInfo:
-    pane_id: str
-
-
-@dataclass
-class RecordedCall:
-    args: list[str]
-    cwd: str | None = None
+__all__ = [
+    "PsmuxBackend",
+    "PsmuxNotFoundError",
+    "PsmuxCommandError",
+    "PaneInfo",
+    "RecordedCall",
+]
 
 
 class PsmuxBackend:
@@ -65,6 +47,10 @@ class PsmuxBackend:
             if resolved is None:
                 raise PsmuxNotFoundError(f"psmux executable not found: {executable}")
             self._executable = resolved
+
+    @property
+    def name(self) -> str:
+        return "psmux"
 
     @property
     def recorded_calls(self) -> list[RecordedCall]:

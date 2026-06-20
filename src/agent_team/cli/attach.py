@@ -8,8 +8,9 @@ from pathlib import Path
 import click
 
 from agent_team.cli._helpers import echo_error, make_orchestrator
-from agent_team.psmux_backend import PsmuxBackend, PsmuxCommandError, PsmuxNotFoundError
+from agent_team.psmux_backend import PsmuxCommandError, PsmuxNotFoundError
 from agent_team.session import SessionNotFoundError, SessionStore
+from agent_team.terminal_backend import make_terminal_backend
 
 
 @click.command("attach")
@@ -31,7 +32,7 @@ def attach_cmd(
         echo_error(str(exc))
 
     try:
-        psmux = PsmuxBackend(mock=no_psmux)
+        psmux = make_terminal_backend(mock=no_psmux)
     except PsmuxNotFoundError as exc:
         echo_error(str(exc))
 
@@ -45,7 +46,7 @@ def attach_cmd(
                 err=True,
             )
             no_psmux = True
-            psmux = PsmuxBackend(mock=True)
+            psmux = make_terminal_backend(mock=True)
 
     project_path = Path(session.project_path)
     if not project_path.exists():

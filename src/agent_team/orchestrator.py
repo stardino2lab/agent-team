@@ -18,10 +18,10 @@ from agent_team.cli_registry import (
 )
 from agent_team.event_log import EventLog
 from agent_team.project_loader import ProjectLoader
-from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
+from agent_team.terminal_backend import TerminalBackend
 
 # Tail bound for reconcile_handled's events.jsonl ingest on attach (D9). Generous
 # on purpose: correctness rests on session.json, not the log. The handled-signals
@@ -225,7 +225,7 @@ class OrchestratorContext:
     store: SessionStore
     approval: SpawnApproval
     runner: TeammateRunner
-    psmux: PsmuxBackend
+    psmux: TerminalBackend
     event_log: EventLog
     no_psmux: bool = False
 
@@ -300,7 +300,7 @@ class Orchestrator:
             persona=None,
             cli=lead_cli,
             pane_id=None,
-            backend="psmux",
+            backend=self.ctx.psmux.name,
             status="pending",
         )
         session = self.ctx.store.create(
@@ -532,7 +532,7 @@ class Orchestrator:
                 persona=res.persona,
                 cli=cli,
                 pane_id=pane_id,
-                backend="psmux",
+                backend=self.ctx.psmux.name,
                 status="starting",
                 request_id=res.request_id,
             )

@@ -19,9 +19,10 @@ from agent_team.mailbox import read_inbox
 from agent_team.mailbox import send as mailbox_send
 from agent_team.personas import PersonaLoadError, PersonaNotFoundError, PersonaRegistry
 from agent_team.project_loader import ProjectConfigError, ProjectLoader
-from agent_team.psmux_backend import PsmuxBackend, PsmuxCommandError
+from agent_team.psmux_backend import PsmuxCommandError
 from agent_team.session import Member, SessionNotFoundError, SessionStore
 from agent_team.spawn_approval import SpawnApproval, SpawnPendingError
+from agent_team.terminal_backend import TerminalBackend, make_terminal_backend
 
 mcp = FastMCP("agent-team")
 
@@ -42,7 +43,7 @@ class McpContext:
     store: SessionStore
     registry: PersonaRegistry
     approval: SpawnApproval
-    psmux: PsmuxBackend
+    psmux: TerminalBackend
     event_log: EventLog
 
 
@@ -77,7 +78,7 @@ def resolve_context(
     project_path: str | None = None,
     store: SessionStore | None = None,
     approval: SpawnApproval | None = None,
-    psmux: PsmuxBackend | None = None,
+    psmux: TerminalBackend | None = None,
     event_log: EventLog | None = None,
     registry: PersonaRegistry | None = None,
 ) -> McpContext:
@@ -105,7 +106,7 @@ def resolve_context(
         store=session_store,
         registry=registry,
         approval=approval or SpawnApproval(),
-        psmux=psmux or PsmuxBackend(),
+        psmux=psmux or make_terminal_backend(),
         event_log=event_log or EventLog(),
     )
 

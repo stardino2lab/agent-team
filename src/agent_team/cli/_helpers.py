@@ -19,11 +19,11 @@ from agent_team.project_loader import (
     ProjectConfigError,
     TeamMdNotFoundError,
 )
-from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import SessionNotFoundError, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval
 from agent_team.tasks import TaskDependencyError, TaskNotFoundError, TaskStateError
 from agent_team.teammate_runner import TeammateRunner
+from agent_team.terminal_backend import TerminalBackend
 
 
 class CliError(Exception):
@@ -168,7 +168,7 @@ def make_orchestrator(
     *,
     session_id: str,
     project_path: Path,
-    psmux: PsmuxBackend,
+    psmux: TerminalBackend,
     no_psmux: bool,
     dry_run: bool,
 ) -> Orchestrator:
