@@ -35,12 +35,11 @@ class CliSpec:
     teammate_launch_args: tuple[str, ...] = ()
     # Named keys the RUNNER presses to SUBMIT the teammate kickoff line after
     # typing it (capitalized to match tmux key names). Default ("Enter",) submits
-    # on Enter (claude/agy). Resolved via resolve_teammate_submit_keys(), which
-    # lets AGENT_TEAM_SUBMIT_KEYS_<CLI> override per platform/version. PROVISIONAL
-    # for codex: ("Tab", "Enter") is the LINUX-observed value (a live Linux e2e
-    # found Enter alone did not submit, so the teammate never reached ready);
-    # Windows is unverified — confirm via tests/manual/s11b-teammate-hardening.md
-    # before treating this as the Windows default.
+    # on Enter for ALL CLIs on Windows (the primary target) — verified live for
+    # codex 0.139.0 + tmux 3.3.5: Enter alone submits (s11b §D11b Step A). Resolved
+    # via resolve_teammate_submit_keys(), so AGENT_TEAM_SUBMIT_KEYS_<CLI> overrides
+    # per platform/version: a LINUX codex e2e needed ("Tab","Enter"), set via that
+    # env var until the S13 backend factory adds sys.platform defaulting.
     teammate_submit_keys: tuple[str, ...] = ("Enter",)
     # How the lead MCP config is delivered: "json" (a file passed via
     # --mcp-config, claude) or "toml" (a CODEX_HOME profile loaded via --profile,
@@ -80,7 +79,8 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_teammate=True,
         mcp_config_filename=None,
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
-        teammate_submit_keys=("Tab", "Enter"),  # PROVISIONAL: Linux-observed; verify Windows
+        # submit keys: default ("Enter",) — Windows codex submits on Enter alone
+        # (verified). Linux needs Tab+Enter via AGENT_TEAM_SUBMIT_KEYS_CODEX.
         mcp_format="toml",
     ),
     "agy": CliSpec(

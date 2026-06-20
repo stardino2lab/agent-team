@@ -143,16 +143,13 @@ def test_claude_teammate_launch_args_empty() -> None:
     assert get_cli_spec("claude").teammate_launch_args == ()
 
 
-def test_codex_teammate_submit_keys_are_tab_enter() -> None:
-    # codex's TUI composer does NOT submit on Enter alone — a live e2e found the
-    # kickoff text sat unsubmitted (teammate never reached ready/mail). Direct
-    # testing confirmed Tab then Enter submits. Capitalized = tmux key names.
-    assert get_cli_spec("codex").teammate_submit_keys == ("Tab", "Enter")
-
-
 def test_default_teammate_submit_keys_are_enter() -> None:
-    # claude / agy (Claude-Code-derived) submit on Enter alone — the default.
+    # All three CLIs submit on Enter alone — the default. Verified live on Windows
+    # for codex 0.139.0 (tmux 3.3.5): Enter alone submits; Tab+Enter is NOT needed
+    # (tests/manual/s11b-teammate-hardening.md §D11b Step A). Linux codex needed
+    # Tab+Enter — that is driven by AGENT_TEAM_SUBMIT_KEYS_CODEX, not the default.
     assert get_cli_spec("claude").teammate_submit_keys == ("Enter",)
+    assert get_cli_spec("codex").teammate_submit_keys == ("Enter",)
     assert get_cli_spec("agy").teammate_submit_keys == ("Enter",)
 
 
@@ -161,17 +158,17 @@ def test_resolve_submit_keys_uses_registry_default_without_env(
 ) -> None:
     monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", raising=False)
     monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", raising=False)
-    assert resolve_teammate_submit_keys("codex") == ("Tab", "Enter")
+    assert resolve_teammate_submit_keys("codex") == ("Enter",)
     assert resolve_teammate_submit_keys("claude") == ("Enter",)
 
 
 def test_resolve_submit_keys_env_override_wins(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Per-platform/per-version override without a code change (e.g. if Windows
-    # codex submits on Enter alone but the registry default is the Linux value).
-    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "Enter")
-    assert resolve_teammate_submit_keys("codex") == ("Enter",)
+    # Per-platform/per-version override without a code change: Linux codex needs
+    # Tab+Enter, set via env while the Windows-verified default stays Enter.
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "Tab Enter")
+    assert resolve_teammate_submit_keys("codex") == ("Tab", "Enter")
     monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", "Tab Enter")
     assert resolve_teammate_submit_keys("claude") == ("Tab", "Enter")
 
