@@ -165,12 +165,15 @@ New module `src/agent_team/terminal_backend.py`:
   `BackendNotFoundError`, `BackendCommandError`. Keep `PsmuxNotFoundError` /
   `PsmuxCommandError` as **aliases** for one milestone so catch-sites
   (`cli/start.py`, `cli/attach.py`, `mcp_server.py`) don't break on a flag day.
-- `make_terminal_backend(*, mock=False) -> TerminalBackend` factory: `mock` →
-  `MockTerminalBackend`; else `AGENT_TEAM_BACKEND` env (`psmux`|`tmux`) if set;
-  else `sys.platform == "win32"` → psmux, otherwise tmux. **Selection lives in
-  one place.** Repoint the 3–4 construction sites (`cli/start.py`,
-  `cli/attach.py`, `mcp_server.py`) to the factory — still psmux on win32, so
-  **byte-identical on Windows**.
+- `make_terminal_backend(*, mock=False) -> TerminalBackend` factory: `mock=True`
+  **short-circuits before any `shutil.which`** and returns `PsmuxBackend(mock=True)`
+  (S13a; the mock path must work on a box with no terminal binary — it is the CI
+  path); else `AGENT_TEAM_BACKEND` env (`psmux`|`tmux`, **invalid value → explicit
+  error**, not silent fallthrough) if set; else `sys.platform == "win32"` → psmux,
+  otherwise tmux. **Selection lives in one place.** Repoint the construction sites
+  — **3 files / 4 calls**: `cli/start.py` (×1), `cli/attach.py` (×2),
+  `mcp_server.py` (×1) — to the factory, preserving the `mock=no_psmux` mapping.
+  Still psmux on win32, so **byte-identical on Windows**.
 - **Fold in submit-keys platform defaulting here.** `CliSpec.teammate_submit_keys`
   (codex `("Tab","Enter")` is Linux-observed; Windows TBD per
   `tests/manual/s11b-teammate-hardening.md` §D11b) is currently env-overridable via
@@ -185,13 +188,24 @@ Seal the abstraction leaks (all behavior-preserving on Windows):
   **Do not rename the on-disk `Session.psmux_session` JSON key** — old
   `session.json` must keep loading (`_member_from_dict` reads verbatim).
 - Centralize launch-line quoting into `quote_pane_arg(value, *, shell_family)`:
-  `posix` → `shlex.quote`; `windows` → current double-quote wrapping. Route the
-  `_build_lead_launch_command` quote sites, the codex bootstrap prompt, and the
-  `pipe_pane` `cat >> "<path>"` redirect through it. Keep paths `.as_posix()`
-  regardless of shell. The set of strings reaching a shell is tiny and fully
-  controlled (exe, a few flags, 2–3 abs paths, one bootstrap) — **no user
-  free-text on a pane command line** (the dangerous multi-line system prompt is
-  delivered via file, never the shell — preserve that invariant).
+  `posix` → `shlex.quote`; `windows` → current double-quote wrapping. **The helper
+  does QUOTING ONLY — it must NOT change the path separator** (plan-review fix). The
+  launch lines keep `str(path)` (backslashes inside quotes on Windows, exactly as
+  today); the `pipe_pane` redirect keeps its own `.as_posix()` applied to the path
+  *before* quoting. Path-form and quoting are two separate concerns; conflating them
+  (forcing `.as_posix()` in the helper) would flip launch-line paths `\`→`/` and
+  **break byte-identical**. Route the `_build_lead_launch_command` quote sites, the
+  codex bootstrap prompt, and the `pipe_pane` redirect through it. The set of
+  strings reaching a shell is tiny and fully controlled (exe, a few flags, 2–3 abs
+  paths, one bootstrap) — **no user free-text on a pane command line** (the
+  dangerous multi-line system prompt is delivered via file, never the shell).
+- **MockTerminalBackend is NOT extracted as a separate class in S13a** (plan-review
+  fix): the mock recording and the psmux-specific `--` argv assembly share one
+  method body, so a standalone mock would duplicate the separator logic. S13a keeps
+  `mock=True` as `PsmuxBackend` behavior and extracts only **value types
+  (`PaneInfo`/`RecordedCall`), the pane-id regex + `_validate_target`, the neutral
+  exceptions, `quote_pane_arg`, and the factory**. The shared `MockTerminalBackend`
+  (parameterized by a per-backend argv builder) lands in **S13b** with `TmuxBackend`.
 
 **Files:** new `src/agent_team/terminal_backend.py`; edit `psmux_backend.py`
 (keep real psmux argv incl. the `--` separator; move shared bits out),
