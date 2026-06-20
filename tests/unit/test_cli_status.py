@@ -79,7 +79,7 @@ def test_status_json_field_set_pinned(session_store: SessionStore, cli_env: dict
     data = json.loads(result.output)
     assert set(data) == {
         "session_id", "session_status", "panes_available", "overall_ok",
-        "members", "spawn_errors", "task_counts", "pending_approval",
+        "escalations", "members", "spawn_errors", "task_counts", "pending_approval",
     }
     assert set(data["members"][0]) == {
         "name", "role", "cli", "status", "pane_id", "health", "last_activity",

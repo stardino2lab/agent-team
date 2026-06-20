@@ -9,6 +9,7 @@ import click
 from agent_team import tasks as tasks_mod
 from agent_team._io import utc_now
 from agent_team.cli._helpers import CLI_ERRORS, echo_error, resolve_base_dir
+from agent_team.escalation import Escalation, derive_escalations
 from agent_team.event_log import EventLog
 from agent_team.health import SessionHealth, build_session_health
 from agent_team.session import SessionStore
@@ -25,12 +26,16 @@ from agent_team.terminal_backend import (
 _EXIT_UNHEALTHY = 2
 
 
-def _health_to_dict(h: SessionHealth) -> dict:
+def _health_to_dict(h: SessionHealth, escalations: list[Escalation]) -> dict:
     return {
         "session_id": h.session_id,
         "session_status": h.session_status,
         "panes_available": h.panes_available,
         "overall_ok": h.overall_ok,
+        "escalations": [
+            {"level": e.level, "subject": e.subject, "reason": e.reason}
+            for e in escalations
+        ],
         "members": [
             {
                 "name": m.name,
@@ -51,7 +56,7 @@ def _health_to_dict(h: SessionHealth) -> dict:
     }
 
 
-def _render_text(h: SessionHealth) -> None:
+def _render_text(h: SessionHealth, escalations: list[Escalation]) -> None:
     panes_note = "" if h.panes_available else "  (pane liveness unavailable)"
     click.echo(
         f"session {h.session_id}  status={h.session_status}  "
@@ -65,6 +70,8 @@ def _render_text(h: SessionHealth) -> None:
         )
     for e in h.spawn_errors:
         click.echo(f"  spawn-error {e.request_id}: {e.kind}")
+    for esc in escalations:
+        click.echo(f"  escalation[{esc.level}] {esc.subject}: {esc.reason}")
     counts = " / ".join(f"{n} {state}" for state, n in sorted(h.task_counts.items()))
     click.echo(f"tasks: {counts or 'none'}")
     if h.pending_approval is not None:
@@ -104,20 +111,24 @@ def status_cmd(session_id: str, as_json: bool, no_panes: bool) -> None:
                 # liveness-unavailable rather than failing the command.
                 panes = None
 
+        task_list = tasks_mod.list_tasks(session_dir)
         health = build_session_health(
             session,
             session_dir=session_dir,
             panes=panes,
             events=EventLog().read(session_dir),
-            tasks=tasks_mod.list_tasks(session_dir),
+            tasks=task_list,
             pending=SpawnApproval().get_pending(session_dir),
             now=utc_now(),
         )
+        escalations = derive_escalations(health, task_list)
 
         if as_json:
-            click.echo(json.dumps(_health_to_dict(health), indent=2, default=str))
+            click.echo(
+                json.dumps(_health_to_dict(health, escalations), indent=2, default=str)
+            )
         else:
-            _render_text(health)
+            _render_text(health, escalations)
     except CLI_ERRORS as exc:
         echo_error(str(exc))
 
