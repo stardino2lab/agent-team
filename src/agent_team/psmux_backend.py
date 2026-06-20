@@ -103,7 +103,7 @@ class PsmuxBackend:
         flag = "-h" if direction == "horizontal" else "-v"
         parts = ["split-window", "-t", safe_session, "-d", flag]
         if size_percent is not None:
-            parts.extend(["-p", str(size_percent)])
+            parts.extend(self._size_args(size_percent))
         if cwd is not None:
             parts.extend(["-c", str(cwd.resolve())])
         args = self._build_argv(*parts, command=command)
@@ -213,10 +213,17 @@ class PsmuxBackend:
         return safe_segment(target, "psmux_session")
 
     def _build_argv(self, *parts: str, command: str | None = None) -> list[str]:
+        # psmux/tmux fork: psmux separates the command with `--`; tmux takes it as
+        # a trailing arg (TmuxBackend overrides this).
         argv = list(parts)
         if command is not None:
             argv.extend(["--", command])
         return argv
+
+    def _size_args(self, size_percent: int) -> list[str]:
+        # psmux/old-tmux percentage flag; tmux>=3.4 removed -p for -l N%
+        # (TmuxBackend overrides this).
+        return ["-p", str(size_percent)]
 
     def _next_mock_pane_id(self) -> str:
         pane_id = f"%{self._mock_next_id}"

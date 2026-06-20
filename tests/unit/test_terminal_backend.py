@@ -74,17 +74,25 @@ def test_factory_env_psmux_overrides_platform(monkeypatch: pytest.MonkeyPatch) -
     assert make_terminal_backend().name == "psmux"
 
 
-def test_factory_tmux_not_yet_implemented(monkeypatch: pytest.MonkeyPatch) -> None:
-    # S13a: tmux selection is explicit-fail until S13b lands TmuxBackend.
+def test_factory_env_tmux_builds_tmux_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENT_TEAM_BACKEND", "tmux")
-    with pytest.raises(BackendNotFoundError):
-        make_terminal_backend()
+    monkeypatch.setattr(_REAL_WHICH, lambda _name: "/usr/bin/tmux")
+    backend = make_terminal_backend()
+    assert backend.name == "tmux"
 
 
 def test_factory_non_win32_default_selects_tmux(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("AGENT_TEAM_BACKEND", raising=False)
-    # Default on POSIX is tmux, which is not yet implemented (S13b).
+    monkeypatch.setattr(_REAL_WHICH, lambda _name: "/usr/bin/tmux")
+    assert make_terminal_backend().name == "tmux"
+
+
+def test_factory_missing_tmux_raises_backend_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_TEAM_BACKEND", "tmux")
+    monkeypatch.setattr(_REAL_WHICH, lambda _name: None)
     with pytest.raises(BackendNotFoundError):
         make_terminal_backend()
 

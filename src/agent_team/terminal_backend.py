@@ -144,11 +144,9 @@ def make_terminal_backend(*, mock: bool = False) -> TerminalBackend:
 
         return PsmuxBackend()
     if name == "tmux":
-        # S13b lands TmuxBackend; until then selection is explicit-fail, not silent.
-        raise BackendNotFoundError(
-            "tmux backend is not yet implemented (planned S13b); "
-            "set AGENT_TEAM_BACKEND=psmux or run with --no-psmux"
-        )
+        from agent_team.tmux_backend import TmuxBackend
+
+        return TmuxBackend()
     raise ValueError(
         f"Unknown AGENT_TEAM_BACKEND: {name!r} (expected 'psmux' or 'tmux')"
     )

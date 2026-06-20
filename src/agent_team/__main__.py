@@ -21,7 +21,7 @@ from agent_team.cli.tui_cmd import tui_cmd
 @click.group()
 @click.version_option(version=__version__, prog_name="agent-team")
 def main() -> None:
-    """Windows-native multi-agent orchestrator for Claude and Codex CLI."""
+    """Cross-platform multi-agent orchestrator (Windows: psmux, Linux/macOS: tmux)."""
 
 
 main.add_command(init_cmd)
