@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -12,9 +11,12 @@ import pytest
 from agent_team.cli_registry import LeadCliNotSupportedError
 from agent_team.event_log import EventLog
 from agent_team.orchestrator import (
+    _CODEX_LEAD_BOOTSTRAP,
     Orchestrator,
     OrchestratorContext,
     _build_lead_launch_command,
+    _codex_mcp_c_flags,
+    _lead_mcp_server_config,
 )
 from agent_team.personas import PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
@@ -423,29 +425,77 @@ def test_start_renders_mcp_config_into_session_dir(
     assert env["AGENT_TEAM_PROJECT_PATH"] == str(minimal_project.resolve())
 
 
-def test_write_lead_mcp_config_codex_renders_codex_home_profile(
-    tmp_path: Path, monkeypatch
+def test_codex_mcp_c_flags_encode_server_as_toml_literal_overrides() -> None:
+    """codex MCP is delivered inline via `-c` (NOT a --profile overlay file).
+
+    codex 0.141 does not load [mcp_servers.*] from a --profile overlay (verified
+    live, s11c); MCP servers come only from the base config or `-c` overrides. So
+    the agent-team server is injected on the launch line as `-c` flags. Each value
+    is a TOML LITERAL string (single-quoted): backslashes survive verbatim
+    (Windows paths) and never collide with the shell double-quote wrap around the
+    whole token. This locks that exact encoding.
+    """
+    server_cfg = {
+        "command": r"C:\py\python.exe",
+        "args": ["-m", "agent_team.mcp_server"],
+        "env": {
+            "AGENT_TEAM_HOME": r"D:\home dir",
+            "AGENT_TEAM_SESSION_ID": "sid-1",
+            "AGENT_TEAM_PROJECT_PATH": r"D:\proj dir",
+        },
+    }
+
+    flags = _codex_mcp_c_flags(server_cfg)
+
+    assert flags == [
+        "-c",
+        "\"mcp_servers.agent-team.command='C:\\py\\python.exe'\"",
+        "-c",
+        "\"mcp_servers.agent-team.args=['-m','agent_team.mcp_server']\"",
+        "-c",
+        "\"mcp_servers.agent-team.env.AGENT_TEAM_HOME='D:\\home dir'\"",
+        "-c",
+        "\"mcp_servers.agent-team.env.AGENT_TEAM_SESSION_ID='sid-1'\"",
+        "-c",
+        "\"mcp_servers.agent-team.env.AGENT_TEAM_PROJECT_PATH='D:\\proj dir'\"",
+    ]
+
+
+def test_codex_mcp_c_flags_rejects_single_quote_in_value() -> None:
+    """A single quote in a value can't be a TOML literal string — fail LOUD.
+
+    Real trigger: a Windows username with an apostrophe (e.g. C:\\Users\\O'Brien)
+    lands a `'` inside sys.executable and the home/project paths. A silent bad
+    encoding would hand codex a broken command and reproduce the original
+    "lead starts with no agent-team tools" failure — so raise a clear error
+    instead of emitting a malformed launch line.
+    """
+    server_cfg = {
+        "command": r"C:\Users\O'Brien\python.exe",
+        "args": ["-m", "agent_team.mcp_server"],
+        "env": {"AGENT_TEAM_HOME": r"D:\home"},
+    }
+    with pytest.raises(ValueError, match="single quote"):
+        _codex_mcp_c_flags(server_cfg)
+
+
+def test_write_lead_mcp_config_codex_rejects_toml_no_longer_writes_a_file(
+    tmp_path: Path,
 ) -> None:
+    """codex no longer writes a CODEX_HOME profile — MCP rides the launch line.
+
+    `_write_lead_mcp_config` is now the claude/json-only seam; calling it for a
+    non-json format is a programming error, not a silent CODEX_HOME mutation.
+    """
     from agent_team.orchestrator import _write_lead_mcp_config
 
-    codex_home = tmp_path / "codex-home"
-    monkeypatch.setenv("CODEX_HOME", str(codex_home))
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     project = tmp_path / "proj"
     project.mkdir()
 
-    path = _write_lead_mcp_config(session_dir, "sid-1", project, cli="codex")
-
-    # The profile lands in CODEX_HOME, named <profile>.config.toml — NOT in session_dir.
-    assert path == codex_home / "agent-team-sid-1.config.toml"
-    assert path.exists()
-    parsed = tomllib.loads(path.read_text(encoding="utf-8"))
-    server = parsed["mcp_servers"]["agent-team"]
-    assert server["command"] == sys.executable
-    assert server["args"] == ["-m", "agent_team.mcp_server"]
-    assert server["env"]["AGENT_TEAM_SESSION_ID"] == "sid-1"
-    assert server["env"]["AGENT_TEAM_PROJECT_PATH"] == str(project.resolve())
+    with pytest.raises(LeadCliNotSupportedError):
+        _write_lead_mcp_config(session_dir, "sid-1", project, cli="codex")
 
 
 def test_write_lead_mcp_config_claude_still_writes_json(tmp_path: Path) -> None:
@@ -462,7 +512,7 @@ def test_write_lead_mcp_config_claude_still_writes_json(tmp_path: Path) -> None:
     assert data["mcpServers"]["agent-team"]["command"] == sys.executable
 
 
-def test_start_codex_lead_writes_profile_agents_and_sends_codex_exec(
+def test_start_codex_lead_writes_agents_md_and_sends_codex_exec_with_inline_mcp(
     minimal_project: Path,
     session_store: SessionStore,
     psmux_backend: PsmuxBackend,
@@ -472,6 +522,7 @@ def test_start_codex_lead_writes_profile_agents_and_sends_codex_exec(
     monkeypatch,
 ) -> None:
     codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     # Flip the lead to codex via config (D4: config-driven lead selection).
     config_path = minimal_project / ".agent-team" / "config.yaml"
@@ -493,19 +544,21 @@ def test_start_codex_lead_writes_profile_agents_and_sends_codex_exec(
     finally:
         orch.stop_watching()
 
-    # Profile written to CODEX_HOME.
-    profile = codex_home / "agent-team-s11c-codex.config.toml"
-    assert profile.exists()
+    # No CODEX_HOME profile is written anymore — MCP rides the launch line, so the
+    # user's ~/.codex is never mutated (the whole point of the -c switch).
+    assert list(codex_home.glob("*.config.toml")) == []
     # Lead context delivered via working-root AGENTS.md (D6 preamble inside).
     agents_md = ctx.session_dir / "lead" / "AGENTS.md"
     assert agents_md.exists()
     assert "You are the team LEAD" in agents_md.read_text(encoding="utf-8")
-    # Lead pane launched with codex exec + profile.
+    # Lead pane launched with codex exec + inline -c MCP overrides (NOT --profile).
     send_calls = [c for c in psmux_backend.recorded_calls if "send-keys" in c.args]
     payload = " ".join(send_calls[0].args)
     assert "codex" in payload
     assert "exec" in payload
-    assert "--profile agent-team-s11c-codex" in payload
+    assert "--profile" not in payload
+    assert "mcp_servers.agent-team.command=" in payload
+    assert "mcp_servers.agent-team.env.AGENT_TEAM_SESSION_ID='s11c-codex'" in payload
     assert "--mcp-config" not in payload  # not the claude path
 
 
@@ -636,22 +689,27 @@ def test_build_lead_launch_command_claude_characterization(
 def test_build_lead_launch_command_codex_characterization(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Byte-exact guard on the codex launch line (which monkeypatched)."""
-    from agent_team.orchestrator import _CODEX_LEAD_BOOTSTRAP
+    """Byte-exact guard on the codex launch line (which monkeypatched).
 
+    Locks the flag ORDER and quoting around the inline -c MCP overrides; the
+    encoding of the -c values themselves is locked separately by
+    test_codex_mcp_c_flags_encode_server_as_toml_literal_overrides.
+    """
     monkeypatch.setattr("agent_team.orchestrator.shutil.which", lambda n: f"/fake/{n}")
+    project = tmp_path / "proj"
     lead_dir = tmp_path / "session" / "lead"
     last = tmp_path / "session" / "lead-last.txt"
     line = _build_lead_launch_command(
         "codex",
         session_id="sid-9",
-        project_path=tmp_path / "proj",
+        project_path=project,
         lead_dir=lead_dir,
         output_last_message=last,
     )
+    mcp_flags = " ".join(_codex_mcp_c_flags(_lead_mcp_server_config("sid-9", project)))
     assert line == (
         f"/fake/codex exec --ignore-user-config --skip-git-repo-check "
-        f"--profile agent-team-sid-9 -C \"{lead_dir}\" -o \"{last}\" "
+        f"{mcp_flags} -C \"{lead_dir}\" -o \"{last}\" "
         f'"{_CODEX_LEAD_BOOTSTRAP}"'
     )
 
@@ -659,8 +717,6 @@ def test_build_lead_launch_command_codex_characterization(
 def test_build_lead_launch_command_for_codex_includes_required_tokens(
     tmp_path: Path,
 ) -> None:
-    from agent_team.orchestrator import _build_lead_launch_command
-
     lead_dir = tmp_path / "session" / "lead"
     last = tmp_path / "session" / "lead-last.txt"
     line = _build_lead_launch_command(
@@ -674,8 +730,11 @@ def test_build_lead_launch_command_for_codex_includes_required_tokens(
     assert "exec" in line
     assert "--ignore-user-config" in line
     assert "--skip-git-repo-check" in line
-    # Profile NAME on the command line (shell-safe) — not inline -c values.
-    assert "--profile agent-team-sid-9" in line
+    # MCP delivered inline via -c overrides — NOT a --profile overlay (codex does
+    # not load [mcp_servers.*] from a profile; verified live, s11c).
+    assert "--profile" not in line
+    assert "-c \"mcp_servers.agent-team.command=" in line
+    assert "mcp_servers.agent-team.env.AGENT_TEAM_SESSION_ID='sid-9'" in line
     assert f'-C "{lead_dir}"' in line
     assert f'-o "{last}"' in line
     # Bootstrap prompt is present and double-quote-wrapped.

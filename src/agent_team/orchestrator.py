@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 import threading
@@ -43,16 +42,6 @@ _CODEX_LEAD_BOOTSTRAP = (
 )
 
 
-def _codex_home() -> Path:
-    """Codex's home dir (where profiles + auth live). Honors $CODEX_HOME."""
-    env = os.environ.get("CODEX_HOME")
-    return Path(env) if env else Path.home() / ".codex"
-
-
-def _codex_profile_name(session_id: str) -> str:
-    return f"agent-team-{session_id}"
-
-
 def _lead_mcp_server_config(session_id: str, project_path: Path) -> dict:
     """The agent-team MCP server entry shared by every lead-config format.
 
@@ -71,24 +60,62 @@ def _lead_mcp_server_config(session_id: str, project_path: Path) -> dict:
     }
 
 
-def _render_codex_profile_toml(server_cfg: dict) -> str:
-    """Render the codex profile TOML for [mcp_servers.agent-team].
+def _codex_mcp_c_flags(server_cfg: dict) -> list[str]:
+    """Inline `-c` overrides that define [mcp_servers.agent-team] for codex exec.
 
-    json.dumps produces valid TOML for our values: a JSON string is a valid TOML
-    basic string (backslashes doubled, so Windows paths survive: \\\\ -> \\), and a
-    JSON list of strings is a valid TOML array. No lone backslashes are emitted,
-    so there are no invalid TOML escapes.
+    codex does NOT load [mcp_servers.*] from a `--profile` overlay file (verified
+    live, s11c, against codex 0.141): MCP servers are read only from the base
+    config or from `-c` inline overrides. So the lead's agent-team server is
+    injected on the launch line via `-c`, which composes with --ignore-user-config
+    — the base config is skipped, so the lead sees ONLY this server, none of the
+    user's own MCP servers (the isolation the dead profile approach aimed for).
+
+    Encoding (each `-c` value is parsed by codex as TOML): every value is a TOML
+    LITERAL string (single-quoted). Literal strings take backslashes verbatim, so
+    Windows paths need no escaping, and their single-quote delimiters never collide
+    with the shell DOUBLE-quote wrap applied to the whole `key=value` token in the
+    launch line. Returns a flat ["-c", '"<frag>"', "-c", '"<frag>"', ...] list.
+
+    Quoting constraints on the values:
+    - A single quote `'` can't live in a TOML literal string AND would also break
+      the shell-token boundary, so it is rejected loudly below (its realistic
+      source is a Windows username with an apostrophe, e.g. C:\\Users\\O'Brien,
+      which would otherwise hand codex a malformed command and silently reproduce
+      the "lead has no agent-team tools" failure). Full apostrophe support is a
+      separate follow-up.
+    - `$` and backtick are SAFE here on Windows (PowerShell does not expand inside
+      double quotes) but would be expanded by a POSIX pane shell (bash/tmux). Our
+      values (python exe, agent-team home, session id, project path) don't contain
+      them; the principled fix — routing every launch-line value through
+      `quote_pane_arg(value, shell_family=...)` — is the planned module-wide rewire
+      (it must also cover the claude arm), so it is deliberately NOT done piecemeal
+      here.
     """
-    lines = [
-        "[mcp_servers.agent-team]",
-        f"command = {json.dumps(server_cfg['command'])}",
-        f"args = {json.dumps(server_cfg['args'])}",
-        "",
-        "[mcp_servers.agent-team.env]",
+
+    def literal(value: str) -> str:
+        if "'" in value:
+            raise ValueError(
+                f"codex -c MCP value contains a single quote, which cannot be "
+                f"TOML-literal-encoded for the launch line: {value!r}. "
+                f"(A Windows username with an apostrophe is the usual cause — "
+                f"use the claude lead, or move AGENT_TEAM_HOME off that path.)"
+            )
+        return f"'{value}'"
+
+    prefix = "mcp_servers.agent-team"
+    args_array = "[" + ",".join(literal(a) for a in server_cfg["args"]) + "]"
+    fragments = [
+        f"{prefix}.command={literal(server_cfg['command'])}",
+        f"{prefix}.args={args_array}",
     ]
-    for key, value in server_cfg["env"].items():
-        lines.append(f"{key} = {json.dumps(value)}")
-    return "\n".join(lines) + "\n"
+    fragments.extend(
+        f"{prefix}.env.{key}={literal(value)}"
+        for key, value in server_cfg["env"].items()
+    )
+    flags: list[str] = []
+    for frag in fragments:
+        flags.extend(["-c", f'"{frag}"'])
+    return flags
 
 
 def _write_codex_lead_agents_md(session_dir: Path, lead_context_text: str) -> Path:
@@ -122,31 +149,25 @@ def _check_lead_cli_supported(cli: str) -> None:
 def _write_lead_mcp_config(
     session_dir: Path, session_id: str, project_path: Path, *, cli: str
 ) -> Path:
-    """Write the lead's MCP config in the CLI's format; return the written path.
+    """Write the lead's MCP config file (json format only); return the written path.
 
     claude (json): {session_dir}/<registry filename>, loaded via --mcp-config.
-    codex (toml): {CODEX_HOME}/agent-team-<sid>.config.toml, loaded via --profile
-    (codex cannot load an arbitrary config-file path; a profile keeps only a
-    shell-safe name on the launch line). --ignore-user-config isolates from the
-    user's base config.toml while auth still resolves from CODEX_HOME.
+    codex does NOT write a file — its MCP server rides the launch line as inline
+    `-c` overrides (see _codex_mcp_c_flags), so the user's ~/.codex is never
+    mutated. Calling this for a non-json format is therefore a programming error.
     """
     spec = get_cli_spec(cli)
-    server_cfg = _lead_mcp_server_config(session_id, project_path)
     if spec.mcp_format == "json":
+        server_cfg = _lead_mcp_server_config(session_id, project_path)
         filename = spec.mcp_config_filename
         assert filename is not None  # json format guarantees a filename (CliSpec)
         config = {"mcpServers": {"agent-team": server_cfg}}
         path = session_dir / filename
         path.write_text(json.dumps(config, indent=2), encoding="utf-8")
         return path
-    if spec.mcp_format == "toml":
-        home = _codex_home()
-        home.mkdir(parents=True, exist_ok=True)
-        path = home / f"{_codex_profile_name(session_id)}.config.toml"
-        path.write_text(_render_codex_profile_toml(server_cfg), encoding="utf-8")
-        return path
     raise LeadCliNotSupportedError(
-        f"Lead CLI {cli!r} has no MCP config renderer for format {spec.mcp_format!r}"
+        f"Lead CLI {cli!r} ({spec.mcp_format!r}) has no MCP config FILE to write; "
+        "non-json leads deliver MCP on the launch line"
     )
 
 
@@ -178,11 +199,13 @@ def _build_lead_launch_command(
     """Compose the lead CLI launch line send_keys'd to the lead pane (per-CLI).
 
     claude: --mcp-config <json> --strict-mcp-config --append-system-prompt-file.
-    codex: codex exec --ignore-user-config --profile <name> -C <lead dir> -o ...
-    + a bootstrap PROMPT (the lead context rides the working-root AGENTS.md, since
-    codex has no --append-system-prompt-file). Stays an elif chain (no Protocol),
-    per the S9 decision. Only registered lead CLIs reach here (start() gates via
-    _check_lead_cli_supported).
+    codex: codex exec --ignore-user-config --skip-git-repo-check <inline -c MCP
+    overrides> -C <lead dir> -o ... + a bootstrap PROMPT (the lead context rides
+    the working-root AGENTS.md, since codex has no --append-system-prompt-file).
+    The agent-team MCP server is injected via `-c` (NOT a --profile overlay: codex
+    does not load [mcp_servers.*] from a profile — verified live, s11c). Stays an
+    elif chain (no Protocol), per the S9 decision. Only registered lead CLIs reach
+    here (start() gates via _check_lead_cli_supported).
     """
     if cli == "claude":
         # Full resolved exe (Windows: claude.CMD shim resolution is inconsistent
@@ -194,15 +217,17 @@ def _build_lead_launch_command(
         )
     if cli == "codex":
         exe = shutil.which(cli) or cli
-        profile = _codex_profile_name(session_id)
+        assert session_id is not None and project_path is not None
+        mcp_flags = _codex_mcp_c_flags(
+            _lead_mcp_server_config(session_id, project_path)
+        )
         return " ".join(
             [
                 exe,
                 "exec",
                 "--ignore-user-config",
                 "--skip-git-repo-check",
-                "--profile",
-                profile,
+                *mcp_flags,
                 "-C",
                 f'"{lead_dir}"',
                 "-o",
@@ -317,13 +342,16 @@ class Orchestrator:
             members_started: list[str] = ["lead"]
             if not self.ctx.no_psmux:
                 spec = get_cli_spec(lead_cli)
-                mcp_config_path = _write_lead_mcp_config(
-                    self.ctx.session_dir, self.ctx.session_id, project_path, cli=lead_cli
-                )
                 lead_context = loader.build_lead_context(
                     playbook_name=playbook, extra_context=context_text
                 )
                 if spec.mcp_format == "json":
+                    mcp_config_path = _write_lead_mcp_config(
+                        self.ctx.session_dir,
+                        self.ctx.session_id,
+                        project_path,
+                        cli=lead_cli,
+                    )
                     prompt_path = _write_lead_system_prompt(
                         self.ctx.session_dir, lead_context.text
                     )
@@ -332,7 +360,7 @@ class Orchestrator:
                         mcp_config=mcp_config_path,
                         system_prompt_file=prompt_path,
                     )
-                else:  # toml (codex): working-root AGENTS.md + --profile
+                else:  # codex: working-root AGENTS.md + inline -c MCP overrides
                     lead_dir = _write_codex_lead_agents_md(
                         self.ctx.session_dir, lead_context.text
                     )
@@ -393,20 +421,9 @@ class Orchestrator:
                     f"{self.ctx.session_dir}: {cleanup_exc!r}",
                     file=sys.stderr,
                 )
-            # The codex lead profile lives in CODEX_HOME, outside session_dir, so
-            # the rmtree above misses it. Best-effort remove on partial start.
-            try:
-                profile = (
-                    _codex_home()
-                    / f"{_codex_profile_name(self.ctx.session_id)}.config.toml"
-                )
-                profile.unlink(missing_ok=True)
-            except OSError as profile_exc:
-                print(
-                    "Orchestrator.start codex profile cleanup failed: "
-                    f"{profile_exc!r}",
-                    file=sys.stderr,
-                )
+            # No CODEX_HOME profile to clean up: the codex lead's MCP config rides
+            # the launch line as inline `-c` overrides, writing nothing outside
+            # session_dir (which the rmtree above already removes).
             raise
         return session
 

@@ -41,9 +41,11 @@ class CliSpec:
     # per platform/version: a LINUX codex e2e needed ("Tab","Enter"), set via that
     # env var until the S13 backend factory adds sys.platform defaulting.
     teammate_submit_keys: tuple[str, ...] = ("Enter",)
-    # How the lead MCP config is delivered: "json" (a file passed via
-    # --mcp-config, claude) or "toml" (a CODEX_HOME profile loaded via --profile,
-    # codex). Required for any lead-capable CLI.
+    # How the lead MCP config is delivered (a DELIVERY-STRATEGY tag, not a file
+    # extension): "json" = a file passed via --mcp-config (claude); "toml" =
+    # TOML-encoded inline `-c` overrides on the codex exec launch line, NO file
+    # written (codex does not load [mcp_servers.*] from a profile; see
+    # orchestrator._codex_mcp_c_flags). Required for any lead-capable CLI.
     mcp_format: str | None = None
 
     def __post_init__(self) -> None:
