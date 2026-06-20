@@ -8,14 +8,23 @@ from pathlib import Path
 
 import click
 
+from agent_team._io import utc_now
 from agent_team.cli._helpers import (
     CLI_ERRORS,
     echo_error,
     follow_once,
     follow_sleep,
+    resolve_base_dir,
     resolve_session_dir,
 )
 from agent_team.event_log import EventLog
+from agent_team.manifest import (
+    load_manifest,
+    render_json,
+    render_jsonl,
+    render_md,
+)
+from agent_team.session import SessionStore
 
 
 @click.group("logs")
@@ -76,5 +85,32 @@ def export_cmd(session: str, dest: Path) -> None:
                     shutil.copy2(transcript, transcripts_dst / f"{member_dir.name}.log")
 
         click.echo(str(dest))
+    except CLI_ERRORS as exc:
+        echo_error(str(exc))
+
+
+@logs_group.command("manifest")
+@click.option("--session", required=True)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "jsonl", "md"]),
+    default="json",
+    show_default=True,
+    help="json = full envelope; jsonl = one task per line; md = task board.",
+)
+def manifest_cmd(session: str, fmt: str) -> None:
+    """Project a session into a read-only, task-centric result manifest.
+
+    Pure projection over the existing stores (Hermes regenerates this post-hoc,
+    even after a crash that skipped the cached result_manifest.json).
+    """
+    try:
+        store = SessionStore(base_dir=resolve_base_dir())
+        sess = store.load(session)
+        session_dir = store.session_dir(session)
+        manifest = load_manifest(sess, session_dir, now=utc_now())
+        renderers = {"json": render_json, "jsonl": render_jsonl, "md": render_md}
+        click.echo(renderers[fmt](manifest))
     except CLI_ERRORS as exc:
         echo_error(str(exc))

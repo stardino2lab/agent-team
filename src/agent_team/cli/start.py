@@ -9,6 +9,7 @@ import click
 
 from agent_team.cli._helpers import echo_error, make_orchestrator
 from agent_team.cli_registry import LeadCliNotSupportedError
+from agent_team.manifest import write_manifest_cache
 from agent_team.project_loader import (
     PlaybookNotFoundError,
     ProjectConfigError,
@@ -109,3 +110,12 @@ def start_cmd(
             type_="orchestrator_stopped",
             payload={"session_id": sid, "reason": "user"},
         )
+        # S16b: cache the result manifest for a fast graceful-exit read. Built
+        # AFTER the stop event so session_stopped=True; best-effort (a crash skips
+        # it and Hermes regenerates via `logs manifest`). Not on --no-block (a test
+        # detach, not a real stop).
+        if not no_block:
+            try:
+                write_manifest_cache(store.load(sid), orch.ctx.session_dir)
+            except Exception:
+                pass

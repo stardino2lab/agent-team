@@ -44,6 +44,9 @@ def test_start_cli_dry_run_creates_session(
     events = EventLog().read(session_store.session_dir("e2e-start"))
     assert any(e.type == "session_started" for e in events)
     assert any(e.type == "orchestrator_stopped" for e in events)
+    # S16b: --no-block is a test detach, not a real stop, so it must NOT write the
+    # result-manifest cache (which would misleadingly imply a finished session).
+    assert not (session_store.session_dir("e2e-start") / "result_manifest.json").exists()
 
 
 def test_start_real_mode_renders_mcp_config_and_sends_claude_launch(
