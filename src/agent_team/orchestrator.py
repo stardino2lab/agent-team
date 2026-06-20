@@ -7,8 +7,11 @@ import shutil
 import sys
 import threading
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
+from agent_team import recovery
+from agent_team._io import parse_ts, utc_now
 from agent_team._watcher import FileWatcher
 from agent_team.cli_registry import (
     LeadCliNotSupportedError,
@@ -20,7 +23,7 @@ from agent_team.project_loader import ProjectLoader
 from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
-from agent_team.terminal_backend import TerminalBackend
+from agent_team.terminal_backend import BackendCommandError, TerminalBackend
 
 # Tail bound for reconcile_handled's events.jsonl ingest on attach (D9). Generous
 # on purpose: correctness rests on session.json, not the log. The handled-signals
@@ -263,6 +266,10 @@ class Orchestrator:
         self._handled_request_ids: set[str] = set()
         self._watcher: FileWatcher | None = None
         self._ready_watcher: FileWatcher | None = None
+        # S14b: a single short-lived timer, armed ONLY while a retry is
+        # outstanding, drives the backoff re-attempt (the FileWatchers are
+        # edge-triggered, so a failed spawn would otherwise never wake again).
+        self._retry_timer: threading.Timer | None = None
         # Serializes member mutations across the approval watcher thread
         # (run_once) and the teammates watcher thread (poll_ready). Reentrant so
         # run_once can call poll_ready while holding it.
@@ -297,6 +304,9 @@ class Orchestrator:
             self._ready_watcher.start()
 
     def stop_watching(self) -> None:
+        if self._retry_timer is not None:
+            self._retry_timer.cancel()
+            self._retry_timer = None
         if self._watcher is not None:
             self._watcher.stop()
             self._watcher = None
@@ -431,6 +441,8 @@ class Orchestrator:
         session = self.ctx.store.load(self.ctx.session_id)
         self.reconcile_handled()
         self.run_once()
+        # Re-arm retries recorded before a detach so a backed-off spawn resumes.
+        self._arm_retry_timer()
         self.start_watching()
         return session
 
@@ -505,6 +517,7 @@ class Orchestrator:
                     ],
                 },
             )
+            recovery.clear_retry(self.ctx.session_dir, res.request_id)
             return False
         session = self.ctx.store.load(self.ctx.session_id)
         existing_teammates = [m.name for m in session.members if m.role == "teammate"]
@@ -521,6 +534,7 @@ class Orchestrator:
                     "existing_teammates": existing_teammates,
                 },
             )
+            recovery.clear_retry(self.ctx.session_dir, res.request_id)
             return False
         teammate_name = res.teammate_name or self._next_teammate_name(session)
         persona = res.persona
@@ -529,15 +543,21 @@ class Orchestrator:
         if self.ctx.no_psmux:
             pane_id: str | None = None
         else:
-            result = self.ctx.runner.spawn(
-                psmux_session=session.psmux_session,
-                persona=persona,
-                prompt=res.prompt or "",
-                teammate_name=teammate_name,
-                session_id=session.session_id,
-                session_dir=self.ctx.session_dir,
-                project_path=Path(session.project_path),
-            )
+            try:
+                result = self.ctx.runner.spawn(
+                    psmux_session=session.psmux_session,
+                    persona=persona,
+                    prompt=res.prompt or "",
+                    teammate_name=teammate_name,
+                    session_id=session.session_id,
+                    session_dir=self.ctx.session_dir,
+                    project_path=Path(session.project_path),
+                )
+            except BackendCommandError as exc:
+                # Execution failure of an already-APPROVED spawn (transient pane/
+                # CLI launch error) — retry the approved resolution without
+                # re-approval, bounded + backed off. Hard stops above never reach here.
+                return self._handle_spawn_failure(res, exc)
             pane_id = result.pane_id
 
         # status="starting": the teammate is not ready until it writes its ready
@@ -555,7 +575,91 @@ class Orchestrator:
             )
         ]
         self.ctx.store.update_members(session.session_id, members)
+        recovery.clear_retry(self.ctx.session_dir, res.request_id)
         return True
+
+    def _handle_spawn_failure(self, res: SpawnResolution, exc: Exception) -> bool:
+        """Record a bounded, backed-off retry for an approved spawn, or give up.
+
+        Returns False (the spawn did not produce a member this attempt). On
+        exhaustion emits a terminal `error` event; otherwise records a retry and
+        arms the timer. run_once still marks the request handled, but the timer's
+        _retry_sweep re-attempts via _spawn_one directly, independent of that gate.
+        """
+        attempts = recovery.attempts_for(self.ctx.session_dir, res.request_id) + 1
+        if attempts >= recovery.MAX_SPAWN_RETRIES:
+            self.ctx.event_log.append(
+                self.ctx.session_dir,
+                type_="error",
+                payload={
+                    "kind": "spawn_failed",
+                    "request_id": res.request_id,
+                    "attempts": attempts,
+                    "error": str(exc)[:500],
+                },
+            )
+            recovery.clear_retry(self.ctx.session_dir, res.request_id)
+            return False
+        delay = recovery.backoff(attempts)
+        recovery.record_retry(
+            self.ctx.session_dir,
+            request_id=res.request_id,
+            attempts=attempts,
+            next_eligible=utc_now() + timedelta(seconds=delay),
+            last_error=str(exc),
+        )
+        self.ctx.event_log.append(
+            self.ctx.session_dir,
+            type_="spawn_retry_scheduled",
+            payload={
+                "request_id": res.request_id,
+                "attempts": attempts,
+                "delay_s": delay,
+            },
+        )
+        self._arm_retry_timer()
+        return False
+
+    def _retry_sweep(self) -> None:
+        """Re-attempt any retry whose backoff has elapsed (timer- or attach-driven)."""
+        with self._lock:
+            now = utc_now()
+            retries = recovery.read_retries(self.ctx.session_dir)
+            resolutions = {
+                r.request_id: r
+                for r in self.ctx.approval.read_resolutions(self.ctx.session_dir)
+            }
+            for rid, rec in retries.items():
+                if parse_ts(rec.next_eligible_ts) <= now:
+                    res = resolutions.get(rid)
+                    if res is not None and res.decision == "approved":
+                        self._spawn_one(res)
+                    else:
+                        # Eligible retry whose resolution is missing or no longer
+                        # approved can never make progress. Drop it so the
+                        # past-eligible record does not drive a 0-delay re-arm
+                        # busy-loop.
+                        recovery.clear_retry(self.ctx.session_dir, rid)
+            self._arm_retry_timer()
+
+    def _arm_retry_timer(self) -> None:
+        """(Re)schedule the single retry timer for the soonest outstanding retry."""
+        if self._retry_timer is not None:
+            self._retry_timer.cancel()
+            self._retry_timer = None
+        retries = recovery.read_retries(self.ctx.session_dir)
+        if not retries:
+            return
+        now = utc_now()
+        soonest = min(parse_ts(r.next_eligible_ts) for r in retries.values())
+        # Floor the delay so an already-past record (e.g. one re-attempted this
+        # tick that records its next backoff only after this re-arm) cannot spin
+        # the timer at 0s. _retry_sweep already clears un-actionable records.
+        delay = max(0.5, (soonest - now).total_seconds())
+        timer = threading.Timer(delay, self._retry_sweep)
+        timer.daemon = True
+        self._retry_timer = timer
+        timer.start()
 
     def poll_ready(self) -> None:
         """Emit teammate_ready for any 'starting' teammate whose marker exists.
