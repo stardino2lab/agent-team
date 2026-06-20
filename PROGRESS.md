@@ -1,8 +1,39 @@
 # Progress
 
-## Current: S11a/b/c done on s11 (codex now a 2nd config-driven lead) — Next: S11 E2E token review + S12 (agy/Antigravity)
+## Current: S11/S12 live e2e run on Windows @ 2026-06-20 — claude-lead + codex-teammate flow PASS; codex-LEAD FAIL (no MCP). Next: agy G1, codex-lead MCP spike, Linux re-verify.
 
 ## Last completed: S10 payment-api E2E @ 2026-06-15 — PASSED
+
+## S11/S12 live e2e (Windows, real CLIs) @ 2026-06-20
+
+Run from an isolated AGENT_TEAM_HOME + worktree sandbox, driving psmux panes directly
+(send-keys / capture-pane). Recorded in `tests/manual/s11b-teammate-hardening.md` (D11b)
+and `tests/manual/s11c-codex-lead.md`.
+
+- **codex submit-keys, per platform (D11b):** raw codex on Windows (0.139.0, tmux 3.3.5)
+  submits the kickoff on **Enter alone** — Tab+Enter is the LINUX value. Flipped the
+  registry codex default back to `("Enter",)`; Linux drives Tab+Enter via
+  `AGENT_TEAM_SUBMIT_KEYS_CODEX` (env override; platform defaulting deferred to S13).
+- **Full e2e — claude lead + codex teammate (D11b Step B): PASS.** claude lead booted,
+  connected to the agent-team MCP under `--strict-mcp-config`, called `spawn_teammate`;
+  TUI approval works (lowercase `y`); the codex teammate auto-submitted its kickoff
+  (Enter), read its brief, ran `agent-team teammate ready` → `teammate_ready` fired, and
+  mailed the lead `DONE2`. The Windows Enter default is validated end-to-end in the real
+  team flow. (claude submits on Enter too — Step C.)
+- **codex-as-lead (S11c): FAIL.** The profile + `codex exec` launch are correct and codex
+  adopts the orchestration-only role, but codex **never loads the agent-team MCP** — it
+  saw only its built-in `collab` tools (spawn_agent/wait_agent), spawned a codex-internal
+  agent, and exited (events.jsonl = `session_started` only). Likely: codex doesn't load
+  `mcp_servers` from a `--profile` overlay (+`--ignore-user-config`). **claude remains the
+  only working lead.**
+- **Two blockers found, both flagged as follow-up tasks:**
+  - codex **update-nag**: the 1st codex teammate after a version bump hits codex's
+    interactive "Update available" prompt; the kickoff's Enter selects "Update now" and the
+    pane dies (the Windows root cause of the "pane auto-terminates" symptom). Fix in
+    progress (`-c check_for_update_on_startup=false`).
+  - codex-lead **MCP delivery** spike (inline `-c` MCP config candidate).
+- Other: D10 transcript stayed 0 bytes for the codex pane (capture gap, recheck); D12
+  trust/approval OK (folder pre-trusted); orchestrator has no dead-pane health check (S14).
 
 - Heterogeneous team (claude+codex) built `PaymentService.refund` + tests under a
   claude/Opus lead; `pytest tests/ -q` → 4 passed, reviewer APPROVED. Real
@@ -267,5 +298,5 @@ passed, ruff clean.
 | S8 | done |
 | S9 | done (manual smoke passed 2026-06-14) |
 | S10 | done (manual E2E passed 2026-06-15) |
-| S11 | planned — multi-CLI (codex 2nd lead) + $20-lead token/observability hardening (D6/D8/D9/D10/D11/D12); see `docs/s11-multi-cli-plan.md` |
-| S12 | S12a (agy/Antigravity teammate) code-complete @ 2026-06-19, G0 live gate PASS — G1+helper token gates pending; lead deferred (no MCP subcommand). See `tests/manual/s12-agy-gates.md` |
+| S11 | a/b code-complete + live e2e @ 2026-06-20: claude-lead + codex-teammate flow PASS (Windows codex submit=Enter). **S11c codex-LEAD FAIL** — codex exec doesn't load the agent-team MCP (spike open). 2 blockers found (codex update-nag, codex-lead MCP) → follow-up tasks. See `tests/manual/s11b-teammate-hardening.md`, `s11c-codex-lead.md` |
+| S12 | S12a (agy/Antigravity teammate) code-complete @ 2026-06-19, G0 live gate PASS — **G1+helper token gates NOT yet run** (pending); lead deferred (no MCP subcommand). See `tests/manual/s12-agy-gates.md` |
