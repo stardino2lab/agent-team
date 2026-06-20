@@ -42,6 +42,7 @@ def test_bundled_personas_accessible_via_importlib() -> None:
     assert names == [
         "agy-implementer.yaml",
         "agy-planner.yaml",
+        "agy-tester.yaml",
         "implementer.yaml",
         "planner.yaml",
         "reviewer.yaml",

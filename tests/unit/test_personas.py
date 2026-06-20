@@ -8,14 +8,54 @@ import pytest
 import yaml
 
 from agent_team._io import InvalidPathSegmentError
-from agent_team.personas import PersonaLoadError, PersonaNotFoundError, PersonaRegistry
+from agent_team.personas import (
+    Persona,
+    PersonaLoadError,
+    PersonaNotFoundError,
+    PersonaRegistry,
+    resolve_persona_cli,
+)
+
+
+def _persona(name: str, cli: str) -> Persona:
+    return Persona(name=name, cli=cli, description="d", spawn_prompt_template="p")
+
+
+def test_resolve_persona_cli_no_overrides_uses_persona_default() -> None:
+    p = _persona("implementer", "codex")
+    assert resolve_persona_cli(p, None) == "codex"
+    assert resolve_persona_cli(p, {}) == "codex"
+
+
+def test_resolve_persona_cli_unrelated_override_uses_default() -> None:
+    # Override keyed by a DIFFERENT persona must not affect this one.
+    p = _persona("implementer", "codex")
+    assert resolve_persona_cli(p, {"tester": "agy"}) == "codex"
+
+
+def test_resolve_persona_cli_applies_matching_override() -> None:
+    p = _persona("implementer", "codex")
+    assert resolve_persona_cli(p, {"implementer": "agy"}) == "agy"
+
+
+def test_resolve_persona_cli_rejects_unsupported_override() -> None:
+    p = _persona("implementer", "codex")
+    with pytest.raises(PersonaLoadError, match="not a supported teammate CLI"):
+        resolve_persona_cli(p, {"implementer": "bogus-cli"})
+
+
+def test_resolve_persona_cli_rejects_malformed_overrides() -> None:
+    # A malformed config (list instead of map) gets a clean error, not AttributeError.
+    p = _persona("implementer", "codex")
+    with pytest.raises(PersonaLoadError, match="must be a map"):
+        resolve_persona_cli(p, ["implementer"])
 
 
 def test_bundled_personas_load(persona_registry: PersonaRegistry) -> None:
     personas = persona_registry.load_all()
     assert set(personas) == {
         "planner", "implementer", "reviewer", "tester",
-        "agy-implementer", "agy-planner",
+        "agy-implementer", "agy-planner", "agy-tester",
     }
     assert personas["planner"].cli == "claude"
     assert personas["implementer"].cli == "codex"
@@ -25,6 +65,7 @@ def test_agy_personas_bundled(persona_registry: PersonaRegistry) -> None:
     personas = persona_registry.load_all()
     assert personas["agy-implementer"].cli == "agy"
     assert personas["agy-planner"].cli == "agy"
+    assert personas["agy-tester"].cli == "agy"
 
 
 def test_list_personas_sorted(persona_registry: PersonaRegistry) -> None:

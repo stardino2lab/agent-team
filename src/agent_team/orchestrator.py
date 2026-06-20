@@ -552,6 +552,10 @@ class Orchestrator:
                     session_id=session.session_id,
                     session_dir=self.ctx.session_dir,
                     project_path=Path(session.project_path),
+                    # S15c: launch under the APPROVED cli (which may be a
+                    # role_cli_overrides remap), not the persona default the runner
+                    # would otherwise re-derive.
+                    cli=cli,
                 )
             except BackendCommandError as exc:
                 # Execution failure of an already-APPROVED spawn (transient pane/

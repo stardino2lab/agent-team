@@ -29,6 +29,33 @@ class Persona:
     coordination_cli: list[str] | None = None
 
 
+def resolve_persona_cli(persona: Persona, overrides: dict | None) -> str:
+    """Resolve the CLI a persona's teammate should launch under (S15c).
+
+    `role_cli_overrides` is an optional project-config map keyed by persona NAME
+    (e.g. ``{"implementer": "agy"}``) that lets a cost-optimized project run a
+    persona under a cheaper / higher-quota CLI without forking the persona file.
+    Default = the persona's own ``cli``. An override naming an unsupported CLI is
+    rejected loudly (not silently ignored) so a typo can't quietly launch the
+    wrong model — validated against the same registry as ``_persona_from_dict``.
+    """
+    if not overrides:
+        return persona.cli
+    if not isinstance(overrides, dict):
+        raise PersonaLoadError(
+            f"role_cli_overrides must be a map of persona->cli, got {type(overrides).__name__}"
+        )
+    override = overrides.get(persona.name)
+    if override is None:
+        return persona.cli
+    if not is_teammate_supported(override):
+        raise PersonaLoadError(
+            f"role_cli_overrides[{persona.name!r}] = {override!r} "
+            "is not a supported teammate CLI"
+        )
+    return override
+
+
 def _persona_from_dict(data: dict) -> Persona:
     try:
         name = data["name"]

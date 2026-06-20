@@ -125,8 +125,13 @@ class TeammateRunner:
         session_id: str,
         session_dir: Path,
         project_path: Path,
+        cli: str | None = None,
     ) -> SpawnResult:
         p = self.registry.get(persona)
+        # S15c: the launch CLI may be overridden (role_cli_overrides) away from the
+        # persona's own `cli`; the prompt/brief stay the persona's. Fall back to the
+        # persona default when no override is threaded through.
+        launch_cli = cli or p.cli
         full_prompt = f"{p.spawn_prompt_template}\n\n{prompt}".strip()
 
         if self._mock:
@@ -150,8 +155,8 @@ class TeammateRunner:
             )
             # D12: per-CLI launch args from the registry (e.g. codex non-interactive
             # approval/sandbox bypass). Read by the RUNNER, never named by the lead.
-            spec = get_cli_spec(p.cli)
-            command = " ".join([p.cli, *spec.teammate_launch_args])
+            spec = get_cli_spec(launch_cli)
+            command = " ".join([launch_cli, *spec.teammate_launch_args])
             # Run the teammate CLI from the project root so relative file edits,
             # pytest, and git target the real checkout.
             pane_id = self.psmux.split_pane(
@@ -178,7 +183,7 @@ class TeammateRunner:
             self.psmux.send_keys(
                 pane_id,
                 _kickoff_line(teammate_name, brief_path.resolve()),
-                submit_keys=resolve_teammate_submit_keys(p.cli),
+                submit_keys=resolve_teammate_submit_keys(launch_cli),
             )
 
         self.recorded_spawns.append(
@@ -193,6 +198,6 @@ class TeammateRunner:
             pane_id=pane_id,
             teammate_name=teammate_name,
             persona=persona,
-            cli=p.cli,
+            cli=launch_cli,
             started_at=format_ts(utc_now()),
         )

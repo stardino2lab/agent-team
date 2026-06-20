@@ -17,7 +17,12 @@ from agent_team._io import InvalidPathSegmentError, safe_segment
 from agent_team.event_log import EventLog
 from agent_team.mailbox import read_inbox
 from agent_team.mailbox import send as mailbox_send
-from agent_team.personas import PersonaLoadError, PersonaNotFoundError, PersonaRegistry
+from agent_team.personas import (
+    PersonaLoadError,
+    PersonaNotFoundError,
+    PersonaRegistry,
+    resolve_persona_cli,
+)
 from agent_team.project_loader import ProjectConfigError, ProjectLoader
 from agent_team.psmux_backend import PsmuxCommandError
 from agent_team.session import Member, SessionNotFoundError, SessionStore
@@ -141,10 +146,18 @@ def handle_list_personas(ctx: McpContext) -> dict:
     project_path = _require_project(ctx)
     config = ProjectLoader(project_path).load_config()
     allowed = config.get("allowed_personas", [])
+    overrides = config.get("role_cli_overrides")
     personas = ctx.registry.filter_allowed(allowed)
     return {
         "personas": [
-            {"name": p.name, "cli": p.cli, "description": p.description} for p in personas
+            # Report the EFFECTIVE cli (after role_cli_overrides) so the lead sees
+            # the CLI a spawn will actually launch under, not the persona default.
+            {
+                "name": p.name,
+                "cli": resolve_persona_cli(p, overrides),
+                "description": p.description,
+            }
+            for p in personas
         ]
     }
 
@@ -167,10 +180,14 @@ def handle_spawn_teammate(
         raise McpToolError(f"Max teammates reached: {session.max_teammates}")
 
     persona_obj = ctx.registry.get(persona)
+    # S15c: a cost-optimized project can remap a persona to a cheaper / higher-quota
+    # CLI via role_cli_overrides; the APPROVED resolution carries this cli end-to-end
+    # so the teammate actually launches under it (orchestrator -> runner).
+    cli = resolve_persona_cli(persona_obj, config.get("role_cli_overrides"))
     req = ctx.approval.request_spawn(
         ctx.session_dir,
         persona=persona,
-        cli=persona_obj.cli,
+        cli=cli,
         prompt=prompt,
         requested_by="lead",
         teammate_name=name,

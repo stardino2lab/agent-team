@@ -190,6 +190,39 @@ def test_spawn_passes_persona_cli_to_split_pane(
     )
 
 
+def test_spawn_cli_override_launches_under_overridden_cli(
+    runner: TeammateRunner,
+    psmux_backend: PsmuxBackend,
+    tmp_path: Path,
+) -> None:
+    """S15c: an explicit `cli` override (role_cli_overrides) actually changes the
+    launched command + submit keys, not just the recorded metadata — the persona
+    (codex implementer) is launched under agy when overridden."""
+    project = tmp_path / "proj"
+    project.mkdir()
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    result = runner.spawn(
+        **_spawn_kwargs(
+            session_dir=session_dir,
+            project_path=project,
+            teammate_name="helper-impl",
+            persona="implementer",  # persona default cli = codex
+        ),
+        cli="agy",  # role_cli_overrides remap
+    )
+
+    assert result.cli == "agy"
+    split = next(c for c in psmux_backend.recorded_calls if "split-window" in c.args)
+    joined = " ".join(split.args)
+    # Launched under agy (with agy's launch args), NOT codex.
+    assert "agy" in joined
+    assert "--dangerously-skip-permissions" in joined
+    assert "codex" not in joined
+    assert "--dangerously-bypass-approvals-and-sandbox" not in joined
+
+
 def test_kickoff_line_is_single_line_with_brief_path() -> None:
     brief = Path("C:/Users/x/.agent-team/sessions/s/teammates/helper-1/AGENTS.md")
     line = _kickoff_line("helper-1", brief)

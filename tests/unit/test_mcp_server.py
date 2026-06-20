@@ -27,7 +27,7 @@ from agent_team.mcp_server import (
     handle_spawn_teammate,
     resolve_context,
 )
-from agent_team.personas import PersonaRegistry
+from agent_team.personas import PersonaLoadError, PersonaRegistry
 from agent_team.psmux_backend import PsmuxBackend
 from agent_team.session import Member, SessionStore
 from agent_team.spawn_approval import SpawnApproval, SpawnPendingError
@@ -70,6 +70,42 @@ def test_spawn_teammate_pending_and_event(mcp_context: McpContext) -> None:
     assert spawn_events[0].payload["request_id"] == "apr-001"
     assert spawn_events[0].payload["persona"] == "planner"
     assert spawn_events[0].payload["requested_by"] == "lead"
+
+
+def _append_config(mcp_context: McpContext, extra: str) -> None:
+    cfg = mcp_context.project_path / ".agent-team" / "config.yaml"
+    cfg.write_text(cfg.read_text(encoding="utf-8") + extra, encoding="utf-8")
+
+
+def test_spawn_teammate_honors_role_cli_override(mcp_context: McpContext) -> None:
+    # S15c: a role_cli_overrides remap reaches the APPROVED resolution's cli (the
+    # value the orchestrator -> runner then launches under), not just the record.
+    _append_config(mcp_context, "\nrole_cli_overrides:\n  implementer: agy\n")
+    handle_spawn_teammate(
+        mcp_context, persona="implementer", prompt="Build it", name="impl-1"
+    )
+    events = mcp_context.event_log.read(mcp_context.session_dir)
+    spawn = next(e for e in events if e.type == "spawn_requested")
+    assert spawn.payload["persona"] == "implementer"
+    assert spawn.payload["cli"] == "agy"  # remapped, not the codex default
+
+
+def test_spawn_teammate_rejects_unsupported_override(mcp_context: McpContext) -> None:
+    # PersonaLoadError (a ValueError) is surfaced to the MCP client by
+    # _map_tool_error; here we call the handler directly so it propagates as-is.
+    _append_config(mcp_context, "\nrole_cli_overrides:\n  implementer: bogus\n")
+    with pytest.raises(PersonaLoadError, match="not a supported teammate CLI"):
+        handle_spawn_teammate(
+            mcp_context, persona="implementer", prompt="x", name="impl-1"
+        )
+
+
+def test_list_personas_reflects_role_cli_override(mcp_context: McpContext) -> None:
+    _append_config(mcp_context, "\nrole_cli_overrides:\n  implementer: agy\n")
+    result = handle_list_personas(mcp_context)
+    by_name = {p["name"]: p for p in result["personas"]}
+    assert by_name["implementer"]["cli"] == "agy"  # effective cli
+    assert by_name["tester"]["cli"] == "codex"  # unremapped persona unchanged
 
 
 def test_spawn_teammate_disallowed_persona(mcp_context: McpContext) -> None:

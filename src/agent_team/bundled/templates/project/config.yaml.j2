@@ -9,6 +9,14 @@ allowed_personas:
   - tester
 default_playbook: new-feature
 
+# Cost-aware role -> CLI remap (optional, S15c). Keyed by persona NAME; the value
+# must be a supported teammate CLI. Lets a persona run under a cheaper / higher-quota
+# CLI without forking its persona file. Unset = each persona uses its own `cli`.
+# Cost recipe — run heavy implementer/tester work on agy, keep claude for reasoning:
+#   role_cli_overrides:
+#     implementer: agy
+#     tester: agy
+
 sandbox:
   implementer: workspace-write
   tester: workspace-write
