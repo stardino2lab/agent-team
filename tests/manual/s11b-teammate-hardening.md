@@ -25,26 +25,29 @@ seam; these confirm the live behavior.
 A live e2e ON LINUX found the codex teammate kickoff was typed but never SUBMITTED:
 codex's TUI composer did not submit on Enter alone (Tab then Enter was needed), so the
 teammate never started, never reached `teammate_ready`/mail, and the pane idled out.
-The fix `CliSpec.teammate_submit_keys` (codex `("Tab","Enter")`, default `("Enter",)`)
-carries the LINUX value as PROVISIONAL — Windows (the primary target) is UNVERIFIED.
-codex's submit behavior may differ by OS and/or codex version, so VERIFY EACH PLATFORM
-and isolate the submit-key variable from the trust-prompt (D12) and readiness (D11).
+codex's submit behavior DIFFERS BY PLATFORM (confirmed): **Windows codex submits on
+Enter alone**; the Linux e2e needed Tab+Enter. So the registry default is `("Enter",)`
+(the Windows winner) and Linux drives Tab+Enter via the env override. Isolate the
+submit-key variable from the trust-prompt (D12) and readiness (D11).
 The runner resolves submit keys via `resolve_teammate_submit_keys(cli)`, overridable
 with `AGENT_TEAM_SUBMIT_KEYS_<CLI>` (e.g. `AGENT_TEAM_SUBMIT_KEYS_CODEX="Tab Enter"`) —
 so you can try sequences without a rebuild.
 
-Run the whole matrix on BOTH:  ☐ Windows (codex 0.139.0, psmux)   ☐ Linux (codex ___, tmux ___)
+Run the whole matrix on BOTH:  ☑ Windows (codex 0.139.0, tmux 3.3.5)   ☐ Linux (codex ___, tmux ___)
 
 ### Step A — raw codex submit (NO agent-team; the ground truth)
-- [ ] Record versions: `codex --version` = ______  ; `tmux -V` / psmux = ______
-- [ ] In a psmux/tmux pane run `codex --dangerously-bypass-approvals-and-sandbox`.
-      Type a line, press **Enter** alone → does it SUBMIT?  Windows: ___  Linux: ___
-- [ ] Type a line, press **Tab** then **Enter** → does it SUBMIT?  Windows: ___  Linux: ___
-- [ ] Winning sequence:  Windows = ____________  Linux = ____________
+- [x] Record versions: `codex --version` = 0.139.0 (Windows)  ; `tmux -V` = 3.3.5 (psmux)
+- [x] In a psmux/tmux pane run `codex --dangerously-bypass-approvals-and-sandbox`.
+      Type a line, press **Enter** alone → does it SUBMIT?  **Windows: YES** (verified
+      2026-06-20: typed "Reply with exactly one word: PONG", Enter alone → codex went
+      "Working" then replied "PONG"; no trust prompt, folder pre-trusted)  Linux: ___
+- [ ] Type a line, press **Tab** then **Enter** → does it SUBMIT?  Windows: n/a (Enter
+      already submits)  Linux: ___ (prior e2e: this was the sequence that worked)
+- [x] Winning sequence:  **Windows = Enter**  Linux = ____________ (re-confirm; was Tab+Enter)
 
 ### Step B — agent-team codex teammate
-- [ ] Spawn a codex teammate with submit keys = the Step-A winner (set
-      `AGENT_TEAM_SUBMIT_KEYS_CODEX` if it differs from the `("Tab","Enter")` default).
+- [ ] Spawn a codex teammate. Windows: no env needed (default Enter = Step-A winner).
+      Linux: `set AGENT_TEAM_SUBMIT_KEYS_CODEX="Tab Enter"` first (Linux Step-A winner).
 - [ ] Kickoff auto-SUBMITS — codex starts working (reads brief, runs `agent-team
       teammate ready`) with NO manual nudge.  Windows: ___  Linux: ___
 - [ ] codex reaches `teammate_ready` + sends mail.  Windows: ___  Linux: ___
@@ -54,9 +57,11 @@ Run the whole matrix on BOTH:  ☐ Windows (codex 0.139.0, psmux)   ☐ Linux (c
 - [ ] claude teammate still submits on Enter alone (no regression).  Windows: ___  Linux: ___
 
 ### Finalize (after both platforms)
-- [ ] Set `cli_registry.py` codex `teammate_submit_keys` default to the WINDOWS winner.
-- [ ] If Linux differs, it runs via `AGENT_TEAM_SUBMIT_KEYS_CODEX` until S13 adds
-      `sys.platform` defaulting (see `docs/s13-next-phase-roadmap.md`).
+- [x] Set `cli_registry.py` codex `teammate_submit_keys` default to the WINDOWS winner
+      = `("Enter",)` (codex override removed; uses the class default). Done 2026-06-20.
+- [ ] Linux runs via `AGENT_TEAM_SUBMIT_KEYS_CODEX="Tab Enter"` until S13 adds
+      `sys.platform` defaulting (see `docs/s13-next-phase-roadmap.md`). Re-confirm the
+      Linux Step A/B on the env-override build (the prior Linux e2e predated it).
 
 ## D12 — codex non-interactive
 - [ ] Spawn a codex teammate; confirm it runs commands WITHOUT prompting for

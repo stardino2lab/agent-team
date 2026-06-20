@@ -334,7 +334,7 @@ def test_spawn_agy_applies_interactive_auto_approve_args(
     assert "--prompt-interactive" not in joined
 
 
-def test_spawn_codex_submits_kickoff_with_tab_enter(
+def test_spawn_codex_submits_kickoff_with_enter_on_windows(
     runner: TeammateRunner,
     psmux_backend: PsmuxBackend,
     tmp_path: Path,
@@ -359,8 +359,10 @@ def test_spawn_codex_submits_kickoff_with_tab_enter(
         if "send-keys" in c.args and "-l" not in c.args
     ]
     assert submits, "no submit send-keys recorded"
-    # codex needs Tab then Enter — Enter alone leaves the kickoff unsubmitted.
-    assert submits[-1].args[-2:] == ["Tab", "Enter"]
+    # Windows-verified: codex 0.139.0 submits on Enter alone (no Tab). Linux drives
+    # Tab+Enter via AGENT_TEAM_SUBMIT_KEYS_CODEX (see the env-override test).
+    assert submits[-1].args[-1] == "Enter"
+    assert "Tab" not in submits[-1].args
 
 
 def test_spawn_claude_submits_kickoff_with_enter_only(
