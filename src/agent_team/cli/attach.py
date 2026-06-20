@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-import threading
 from pathlib import Path
 
 import click
 
-from agent_team.cli._helpers import echo_error, make_orchestrator
+from agent_team.cli._helpers import (
+    block_until_stopped,
+    clear_stop,
+    echo_error,
+    make_orchestrator,
+)
 from agent_team.psmux_backend import PsmuxCommandError, PsmuxNotFoundError
 from agent_team.session import SessionNotFoundError, SessionStore
 from agent_team.terminal_backend import make_terminal_backend
@@ -68,19 +72,6 @@ def attach_cmd(
         f"(this shell drives spawn approvals; do not close it)."
     )
 
-    try:
-        if no_block:
-            return
-        stop_event = threading.Event()
-        try:
-            while not stop_event.wait(timeout=0.5):
-                pass
-        except KeyboardInterrupt:
-            pass
-    finally:
-        orch.stop_watching()
-        orch.ctx.event_log.append(
-            orch.ctx.session_dir,
-            type_="orchestrator_stopped",
-            payload={"session_id": session_id, "reason": "user"},
-        )
+    # Drop any stale stop marker, then block until Ctrl-C or `agent-team stop` (S18b1).
+    clear_stop(orch.ctx.session_dir)
+    block_until_stopped(orch, session_id, no_block=no_block, manifest=True)

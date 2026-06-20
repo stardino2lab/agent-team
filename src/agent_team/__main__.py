@@ -14,6 +14,7 @@ from agent_team.cli.mail import mail_group
 from agent_team.cli.personas_cmd import personas_group
 from agent_team.cli.start import start_cmd
 from agent_team.cli.status import status_cmd
+from agent_team.cli.stop import stop_cmd
 from agent_team.cli.task import task_group
 from agent_team.cli.teammate import teammate_group
 from agent_team.cli.tui_cmd import tui_cmd
@@ -29,6 +30,7 @@ main.add_command(init_cmd)
 main.add_command(start_cmd)
 main.add_command(attach_cmd)
 main.add_command(status_cmd)
+main.add_command(stop_cmd)
 main.add_command(approvals_group)
 main.add_command(mail_group)
 main.add_command(task_group)

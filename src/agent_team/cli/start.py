@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import threading
 from pathlib import Path
 
 import click
 
-from agent_team.cli._helpers import echo_error, make_orchestrator
+from agent_team.cli._helpers import (
+    block_until_stopped,
+    clear_stop,
+    echo_error,
+    make_orchestrator,
+)
 from agent_team.cli_registry import LeadCliNotSupportedError
-from agent_team.manifest import write_manifest_cache
 from agent_team.project_loader import (
     PlaybookNotFoundError,
     ProjectConfigError,
@@ -94,28 +97,7 @@ def start_cmd(
         f"(this shell drives spawn approvals; do not close it)."
     )
 
-    try:
-        if no_block:
-            return
-        stop_event = threading.Event()
-        try:
-            while not stop_event.wait(timeout=0.5):
-                pass
-        except KeyboardInterrupt:
-            pass
-    finally:
-        orch.stop_watching()
-        orch.ctx.event_log.append(
-            orch.ctx.session_dir,
-            type_="orchestrator_stopped",
-            payload={"session_id": sid, "reason": "user"},
-        )
-        # S16b: cache the result manifest for a fast graceful-exit read. Built
-        # AFTER the stop event so session_stopped=True; best-effort (a crash skips
-        # it and Hermes regenerates via `logs manifest`). Not on --no-block (a test
-        # detach, not a real stop).
-        if not no_block:
-            try:
-                write_manifest_cache(store.load(sid), orch.ctx.session_dir)
-            except Exception:
-                pass
+    # Drop any stale stop marker from a prior run so this fresh start doesn't
+    # exit instantly; then block until Ctrl-C or `agent-team stop` (S18b1).
+    clear_stop(orch.ctx.session_dir)
+    block_until_stopped(orch, sid, no_block=no_block, manifest=True)
