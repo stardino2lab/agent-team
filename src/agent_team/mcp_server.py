@@ -28,6 +28,7 @@ from agent_team.psmux_backend import PsmuxCommandError
 from agent_team.session import Member, SessionNotFoundError, SessionStore
 from agent_team.spawn_approval import SpawnApproval, SpawnPendingError
 from agent_team.terminal_backend import TerminalBackend, make_terminal_backend
+from agent_team.worktree import WorktreeError, remove_worktree, worktree_path
 
 mcp = FastMCP("agent-team")
 
@@ -204,6 +205,16 @@ def handle_shutdown_teammate(ctx: McpContext, name: str) -> dict:
         raise McpToolError(f"Teammate not found: {name}")
     if member.pane_id:
         ctx.psmux.kill_pane(member.pane_id)
+    # S17: prune the teammate's isolated worktree if one exists. Unconditional and
+    # idempotent — the isolate_worktrees flag may have flipped since spawn, so we
+    # key off the worktree's presence, not the current config. Best-effort: a prune
+    # failure must not block the shutdown.
+    wt = worktree_path(ctx.session_dir, name)
+    if wt.exists():
+        try:
+            remove_worktree(Path(session.project_path), wt)
+        except WorktreeError:
+            pass
     updated = [m for m in session.members if m.name != name]
     ctx.store.update_members(ctx.session_id, updated)
     ctx.event_log.append(

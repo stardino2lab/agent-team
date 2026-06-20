@@ -197,6 +197,36 @@ def test_shutdown_teammate_kill_pane_and_event(mcp_context: McpContext) -> None:
     assert any(e.type == "teammate_shutdown" for e in events)
 
 
+def test_shutdown_teammate_prunes_worktree(
+    mcp_context: McpContext, monkeypatch
+) -> None:
+    # S17: when an isolated worktree exists for the teammate, shutdown prunes it
+    # (unconditional + idempotent). Stub remove_worktree so the test needs no git.
+    wt = mcp_context.session_dir / "worktrees" / "helper-1"
+    wt.mkdir(parents=True)
+    calls: list = []
+    monkeypatch.setattr(
+        "agent_team.mcp_server.remove_worktree",
+        lambda project, path: calls.append((project, path)) or True,
+    )
+    handle_shutdown_teammate(mcp_context, "helper-1")
+    assert len(calls) == 1
+    assert calls[0][1] == wt  # the teammate's worktree path was pruned
+
+
+def test_shutdown_teammate_no_worktree_no_prune(
+    mcp_context: McpContext, monkeypatch
+) -> None:
+    # No worktree dir -> remove_worktree is never called (key off presence).
+    calls: list = []
+    monkeypatch.setattr(
+        "agent_team.mcp_server.remove_worktree",
+        lambda project, path: calls.append(path) or True,
+    )
+    handle_shutdown_teammate(mcp_context, "helper-1")
+    assert calls == []
+
+
 def test_shutdown_teammate_no_pane_id(
     session_store: SessionStore,
     consumer_project: Path,

@@ -19,11 +19,18 @@ from agent_team.cli_registry import (
     is_lead_supported,
 )
 from agent_team.event_log import EventLog
-from agent_team.project_loader import ProjectLoader
+from agent_team.personas import PersonaNotFoundError
+from agent_team.project_loader import ProjectConfigError, ProjectLoader
 from agent_team.session import Member, Session, SessionStore, default_base_dir
 from agent_team.spawn_approval import SpawnApproval, SpawnResolution
 from agent_team.teammate_runner import TeammateRunner
 from agent_team.terminal_backend import BackendCommandError, TerminalBackend
+from agent_team.worktree import (
+    WorktreeError,
+    create_worktree,
+    should_isolate,
+    worktree_path,
+)
 
 # Tail bound for reconcile_handled's events.jsonl ingest on attach (D9). Generous
 # on purpose: correctness rests on session.json, not the log. The handled-signals
@@ -543,6 +550,26 @@ class Orchestrator:
         if self.ctx.no_psmux:
             pane_id: str | None = None
         else:
+            project_path = Path(session.project_path)
+            # S17: a write-capable teammate in an isolate_worktrees project runs in
+            # its own git worktree (containment). A creation failure is a hard,
+            # predictable stop — never fall back to the shared checkout.
+            try:
+                isolated = self._maybe_isolate_worktree(persona, teammate_name, project_path)
+            except WorktreeError as exc:
+                self.ctx.event_log.append(
+                    self.ctx.session_dir,
+                    type_="error",
+                    payload={
+                        "kind": "worktree_failed",
+                        "request_id": res.request_id,
+                        "error": str(exc),
+                    },
+                )
+                recovery.clear_retry(self.ctx.session_dir, res.request_id)
+                return False
+            if isolated is not None:
+                project_path = isolated
             try:
                 result = self.ctx.runner.spawn(
                     psmux_session=session.psmux_session,
@@ -551,7 +578,7 @@ class Orchestrator:
                     teammate_name=teammate_name,
                     session_id=session.session_id,
                     session_dir=self.ctx.session_dir,
-                    project_path=Path(session.project_path),
+                    project_path=project_path,
                     # S15c: launch under the APPROVED cli (which may be a
                     # role_cli_overrides remap), not the persona default the runner
                     # would otherwise re-derive.
@@ -581,6 +608,34 @@ class Orchestrator:
         self.ctx.store.update_members(session.session_id, members)
         recovery.clear_retry(self.ctx.session_dir, res.request_id)
         return True
+
+    def _maybe_isolate_worktree(
+        self, persona: str, teammate_name: str, project_path: Path
+    ) -> Path | None:
+        """Return the teammate's isolated worktree path, or None for no isolation.
+
+        Reads config fresh from the SESSION's project (the watcher tick runs on a
+        separate thread from start(), and the config could be absent) — a missing
+        config or unknown persona degrades to no-isolation, never crashes the tick.
+        The dry-run mock runner edits nothing, so it is never isolated. A test
+        double without `is_mock` likewise doesn't launch a real teammate, so it
+        defaults to no-isolation (getattr default True).
+        """
+        if getattr(self.ctx.runner, "is_mock", True):
+            return None
+        try:
+            config = ProjectLoader(project_path).load_config()
+        except ProjectConfigError:
+            return None
+        try:
+            persona_obj = self.ctx.runner.registry.get(persona)
+        except PersonaNotFoundError:
+            return None
+        if not should_isolate(persona_obj, config):
+            return None
+        return create_worktree(
+            project_path, worktree_path(self.ctx.session_dir, teammate_name)
+        )
 
     def _handle_spawn_failure(self, res: SpawnResolution, exc: Exception) -> bool:
         """Record a bounded, backed-off retry for an approved spawn, or give up.

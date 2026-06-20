@@ -17,6 +17,13 @@ default_playbook: new-feature
 #     implementer: agy
 #     tester: agy
 
+# Worktree isolation (optional, S17 — containment). When true, each write-capable
+# teammate (workspace-write persona) runs in its own `git worktree` under the
+# session dir instead of the shared checkout; the lead/reviewer integrates by merge.
+# Requires the project to be a git repo. Recommended (effectively required) for
+# unattended/autonomous runs. Unset/false = teammates share the project checkout.
+#   isolate_worktrees: true
+
 sandbox:
   implementer: workspace-write
   tester: workspace-write

@@ -115,6 +115,12 @@ class TeammateRunner:
         self._mock = mock
         self.recorded_spawns: list[RecordedSpawn] = []
 
+    @property
+    def is_mock(self) -> bool:
+        """Dry-run runner: edits nothing, so the orchestrator skips worktree
+        isolation for it (S17)."""
+        return self._mock
+
     def spawn(
         self,
         *,
