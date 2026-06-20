@@ -1,9 +1,9 @@
 # S18b daemon lifecycle gates
 
-Covers the start-and-walk-away lifecycle. S18b1 (this slice) = graceful `stop` +
-exit code + the shared `block_until_stopped` loop honoring a stop marker. S18b2
-(terminal states + mandatory `--timeout` + kill-all-panes + manifest `final`) and
-S18b3 (signal-handler manifest + orphan-pane reaper) extend this doc as they land.
+Covers the start-and-walk-away lifecycle across S18b1 (graceful `stop` + exit code
++ the shared `block_until_stopped` marker loop), S18b2 (terminal states + mandatory
+`--timeout` + kill-all-panes + manifest `final`), and S18b3 (SIGTERM graceful stop +
+orphan-pane reaper). Pure logic is unit-tested; these gates verify the live signals.
 
 ## S18b1 — graceful stop + exit code
 - [ ] `agent-team start --project <repo> --session <sid>` in one terminal (it
@@ -41,12 +41,18 @@ S18b3 (signal-handler manifest + orphan-pane reaper) extend this doc as they lan
       (timeout/stopped/user); while running → `final: false`, status `active`.
       Confirm Hermes can gate on `final` (mid-run reads show `final:false`).
 
-## Pending (S18b3 — land with that slice)
-- [ ] Crash-safe terminal manifest from a signal handler (SIGTERM), not only the
-      `finally`; a SIGKILL'd orchestrator still yields a valid manifest via
-      `logs manifest` (pure projection).
-- [ ] Orphan-pane reaper: on attach/restart, panes left by a dead orchestrator are
-      detected and `kill_session`ed (auto-approve teammates must not edit headless).
+## S18b3 — SIGTERM graceful stop + orphan reaper (unit-covered; verify live on Linux)
+- [ ] On a headless Linux host, `kill -TERM <pid>` of a backgrounded autonomous
+      `start` → the run exits gracefully emitting `orchestrator_stopped{reason:
+      "signal"}`, kills all panes, and writes `result_manifest.json` (NOT an abrupt
+      death). (SIGTERM is a no-op on Windows — verify on the S18c headless host.)
+- [ ] SIGKILL (`kill -9`) the orchestrator → panes are orphaned (the signal can't
+      be handled). Then `agent-team stop --session <id>` REAPS them: `git -C` /
+      `psmux list` shows the panes gone. (stop = terminate = reap, unlike an
+      attended Ctrl-C which preserves panes for re-attach.)
+- [ ] After ANY crash, `agent-team logs manifest --session <id>` still yields a
+      valid manifest (pure projection over the stores — S16a — works post-hoc, no
+      cache needed).
 
 ## Notes
 - The supported "daemon" mode is the foreground blocking run backgrounded by the

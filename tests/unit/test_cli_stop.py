@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
 
 from agent_team.__main__ import main
 from agent_team.cli._helpers import (
+    _install_sigterm,
     block_until_stopped,
     clear_stop,
     request_stop,
@@ -198,6 +203,94 @@ def test_attended_marker_stop_does_not_kill_panes(session_store: SessionStore) -
     t.join(timeout=5)
     # Attended stop preserves panes so the human can re-attach / inspect.
     assert _killed_session(psmux) is False
+
+
+# --- SIGTERM graceful stop (S18b3) ------------------------------------------
+
+
+def test_signal_emits_signal_reason_and_kills_panes(session_store: SessionStore) -> None:
+    # The `_signalled` seam simulates SIGTERM delivery without a real OS signal: a
+    # signal stop emits {reason:"signal"} and tears down panes even when attended.
+    from agent_team.psmux_backend import PsmuxBackend
+
+    psmux = PsmuxBackend(mock=True)
+    orch, session_dir = _orch_with_psmux(session_store, "sig", psmux)
+    sig = threading.Event()
+    sig.set()
+    block_until_stopped(
+        orch, "sig", no_block=False, manifest=False, kill_panes=False, _signalled=sig
+    )
+    events = _stopped_events(session_dir)
+    assert len(events) == 1 and events[0].payload["reason"] == "signal"
+    assert _killed_session(psmux) is True
+
+
+def test_install_sigterm_is_noop_off_main_thread() -> None:
+    # signal.signal raises ValueError off the main thread -> guarded to (False, None)
+    # so the threaded block_until_stopped paths never crash.
+    result: dict = {}
+
+    def run() -> None:
+        result["out"] = _install_sigterm(lambda *_a: None)
+
+    t = threading.Thread(target=run)
+    t.start()
+    t.join()
+    assert result["out"] == (False, None)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="SIGTERM delivery is a no-op on Windows"
+)
+def test_sigterm_delivery_breaks_loop(session_store: SessionStore) -> None:
+    # Real delivery (Linux/macOS): the installed handler flips the flag and the loop
+    # exits with reason "signal" — a container/`kill <pid>` stop is now graceful.
+    import signal
+
+    from agent_team.psmux_backend import PsmuxBackend
+
+    orch, session_dir = _orch_with_psmux(session_store, "term", PsmuxBackend(mock=True))
+
+    def killer() -> None:
+        time.sleep(0.3)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=killer, daemon=True).start()
+    block_until_stopped(orch, "term", no_block=False, manifest=False)
+    events = _stopped_events(session_dir)
+    assert events[-1].payload["reason"] == "signal"
+
+
+# --- stop command + orphan reaper -------------------------------------------
+
+
+def test_reap_orphan_panes_kills_via_injected_backend(
+    session_store: SessionStore, sessions_base: Path, monkeypatch
+) -> None:
+    from agent_team.cli.stop import _reap_orphan_panes
+    from agent_team.psmux_backend import PsmuxBackend
+
+    monkeypatch.setenv("AGENT_TEAM_HOME", str(sessions_base))
+    psmux = PsmuxBackend(mock=True)
+    session_store.create(session_id="reap", project_path="c:\\p", psmux_session="reap-px")
+    _reap_orphan_panes("reap", backend_factory=lambda: psmux)
+    kill = next(c for c in psmux.recorded_calls if "kill-session" in c.args)
+    assert "reap-px" in kill.args  # the dead orchestrator's panes are reaped
+
+
+def test_reap_orphan_panes_swallows_backend_error(
+    session_store: SessionStore, sessions_base: Path, monkeypatch
+) -> None:
+    from agent_team.cli.stop import _reap_orphan_panes
+    from agent_team.terminal_backend import BackendNotFoundError
+
+    monkeypatch.setenv("AGENT_TEAM_HOME", str(sessions_base))
+    session_store.create(session_id="r2", project_path="c:\\p", psmux_session="r2-px")
+
+    def boom():
+        raise BackendNotFoundError("no psmux")
+
+    _reap_orphan_panes("r2", backend_factory=boom)  # best-effort: must not raise
 
 
 # --- stop command -----------------------------------------------------------
