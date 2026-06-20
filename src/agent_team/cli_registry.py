@@ -10,6 +10,7 @@ so it cannot yet host the agent-team MCP server).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 
@@ -33,10 +34,13 @@ class CliSpec:
     # prompt) so a teammate pane works hands-off. claude: none (bare launch).
     teammate_launch_args: tuple[str, ...] = ()
     # Named keys the RUNNER presses to SUBMIT the teammate kickoff line after
-    # typing it. Default ("Enter",) submits on Enter (claude/agy). codex's TUI
-    # composer needs ("Tab", "Enter") — Enter alone does not submit (a live e2e
-    # found the kickoff sat unsubmitted, so the teammate never reached ready).
-    # Capitalized to match tmux key names (cf. the existing "Enter" usage).
+    # typing it (capitalized to match tmux key names). Default ("Enter",) submits
+    # on Enter (claude/agy). Resolved via resolve_teammate_submit_keys(), which
+    # lets AGENT_TEAM_SUBMIT_KEYS_<CLI> override per platform/version. PROVISIONAL
+    # for codex: ("Tab", "Enter") is the LINUX-observed value (a live Linux e2e
+    # found Enter alone did not submit, so the teammate never reached ready);
+    # Windows is unverified — confirm via tests/manual/s11b-teammate-hardening.md
+    # before treating this as the Windows default.
     teammate_submit_keys: tuple[str, ...] = ("Enter",)
     # How the lead MCP config is delivered: "json" (a file passed via
     # --mcp-config, claude) or "toml" (a CODEX_HOME profile loaded via --profile,
@@ -76,7 +80,7 @@ _REGISTRY: dict[str, CliSpec] = {
         supports_teammate=True,
         mcp_config_filename=None,
         teammate_launch_args=("--dangerously-bypass-approvals-and-sandbox",),
-        teammate_submit_keys=("Tab", "Enter"),
+        teammate_submit_keys=("Tab", "Enter"),  # PROVISIONAL: Linux-observed; verify Windows
         mcp_format="toml",
     ),
     "agy": CliSpec(
@@ -111,3 +115,19 @@ def is_teammate_supported(name: str) -> bool:
 def is_lead_supported(name: str) -> bool:
     spec = _REGISTRY.get(name)
     return spec is not None and spec.supports_lead
+
+
+def resolve_teammate_submit_keys(name: str) -> tuple[str, ...]:
+    """The keys the runner presses to submit a teammate's kickoff, env-overridable.
+
+    Defaults to the registry's ``teammate_submit_keys`` for the CLI. The env var
+    ``AGENT_TEAM_SUBMIT_KEYS_<CLI_UPPER>`` (whitespace-separated tmux key names,
+    e.g. "Tab Enter") overrides it, so the submit sequence can be tuned per
+    platform / codex version without a code change — and Linux can run today
+    before the S13 backend factory adds ``sys.platform`` defaulting. A set-but-
+    empty value means "type without submitting" (no submit keypress).
+    """
+    override = os.environ.get(f"AGENT_TEAM_SUBMIT_KEYS_{name.upper()}")
+    if override is not None:
+        return tuple(override.split())
+    return get_cli_spec(name).teammate_submit_keys
