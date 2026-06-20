@@ -20,7 +20,7 @@ from agent_team.project_loader import (
     TeamMdNotFoundError,
 )
 from agent_team.session import SessionNotFoundError, SessionStore, default_base_dir
-from agent_team.spawn_approval import SpawnApproval
+from agent_team.spawn_approval import SpawnApproval, SpawnRequestNotFoundError
 from agent_team.tasks import TaskDependencyError, TaskNotFoundError, TaskStateError
 from agent_team.teammate_runner import TeammateRunner
 from agent_team.terminal_backend import TerminalBackend
@@ -43,6 +43,10 @@ CLI_ERRORS: tuple[type[Exception], ...] = (
     TeamMdNotFoundError,
     PlaybookNotFoundError,
     PlaybookLoadError,
+    # Approving/denying with nothing pending (a LookupError, so not covered by the
+    # ValueError catch below). SpawnRequestMismatchError is a ValueError -> already
+    # caught; do NOT remove ValueError thinking it's redundant.
+    SpawnRequestNotFoundError,
     ValueError,
 )
 

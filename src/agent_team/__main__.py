@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from agent_team import __version__
+from agent_team.cli.approve import approvals_group
 from agent_team.cli.attach import attach_cmd
 from agent_team.cli.context import context_group
 from agent_team.cli.init import init_cmd
@@ -28,6 +29,7 @@ main.add_command(init_cmd)
 main.add_command(start_cmd)
 main.add_command(attach_cmd)
 main.add_command(status_cmd)
+main.add_command(approvals_group)
 main.add_command(mail_group)
 main.add_command(task_group)
 main.add_command(logs_group)
