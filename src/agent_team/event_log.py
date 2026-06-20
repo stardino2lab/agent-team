@@ -52,7 +52,13 @@ class EventLog:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            data = json.loads(line)
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                # Tolerate a torn trailing line (orchestrator killed mid-append):
+                # one truncated line must not make the WHOLE event log unreadable
+                # (which would break wait_for_event, reconcile, and the manifest).
+                continue
             event = Event(type=data["type"], ts=data["ts"], payload=data["payload"])
             if since_dt is not None and parse_ts(event.ts) <= since_dt:
                 continue

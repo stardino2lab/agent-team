@@ -18,6 +18,19 @@ def test_append_multiple_events(session_dir: Path, event_log: EventLog) -> None:
     assert events[1].type == "mail_sent"
 
 
+def test_read_tolerates_torn_trailing_line(session_dir: Path, event_log: EventLog) -> None:
+    # S14d: a crash mid-append leaves a truncated last line; it must NOT make the
+    # whole event log unreadable (else wait_for_event/reconcile/manifest all break).
+    event_log.append(session_dir, type_="session_started", payload={"session_id": "x"})
+    path = session_dir / "events.jsonl"
+    with path.open("a", encoding="utf-8") as f:
+        f.write('{"type": "mail_sent", "ts": "2026-06-2')  # torn mid-write
+
+    events = event_log.read(session_dir)
+    assert len(events) == 1  # the valid event survives; the torn line is skipped
+    assert events[0].type == "session_started"
+
+
 def test_read_since_and_tail(session_dir: Path, event_log: EventLog) -> None:
     t0 = datetime.fromisoformat("2026-06-10T12:00:00+00:00")
     event_log.append(
