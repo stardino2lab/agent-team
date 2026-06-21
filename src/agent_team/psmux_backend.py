@@ -254,11 +254,19 @@ class PsmuxBackend:
 
         assert self._executable is not None
         full_argv = [self._executable, *args]
+        # Force UTF-8 decode: psmux pane captures carry box-drawing (─ = e2 94 80),
+        # bullets (●), and CJK that the Windows locale codepage (cp949 on Korean
+        # boxes) cannot decode. Without this, text=True falls back to the locale
+        # codec and a reader thread dies with UnicodeDecodeError mid-capture,
+        # crashing the orchestrator watch loop. errors="replace" keeps a stray
+        # byte from being fatal — pane text is heuristic input, not data.
         result = subprocess.run(
             full_argv,
             shell=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=cwd_str,
         )
         if result.returncode != 0:
