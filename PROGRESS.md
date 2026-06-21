@@ -16,9 +16,17 @@
 | S17 worktree 격리 (G6) | `tests/manual/s17-worktree-gates.md` | 두 writer 같은 파일 격리/머지/prune, Windows 경로길이·락 | 대기 |
 | S14 status 게이트 | `tests/manual/s14-status-gates.md` | 실제 dead-pane, transcript mtime 전진 | 대기 |
 | S13c tmux Linux (G3/G4) | `tests/manual/s13-tmux-linux.md` | Linux tmux 멀티페인/kickoff/dead-detect (tmux≥3.4) | 대기 |
-| S15a/S12 agy 토큰 (G1) | `tests/manual/s12-agy-gates.md` | agy 티미 라이브: kickoff, auto-approve, helper-under-agy | G0 PASS, G1 대기 |
+| S15a/S12 agy 토큰 (G1) | `tests/manual/s12-agy-gates.md` | agy 티미 라이브: kickoff, auto-approve, helper-under-agy | G0 PASS · G1 부분: agy auto-approve+helper+no-trust PASS(Win), 자동 kickoff **cold=FAIL(drop)**/warm=OK · 버그2(아래) |
 
 **연기 (소비자 없어서):** S15b agy-LEAD (agy `mcp` 서브커맨드 부재 → MCP 호스팅 스파이크 필요), S16c/d/e (실제 Hermes 생겨야 매니페스트/triage 스키마 동결).
+
+### G1 라이브 실행 발견 @ 2026-06-21 (Windows, 한글 로케일)
+agy 티미는 `--dangerously-skip-permissions`로 **trust 모달 없이** 부팅, 툴콜 **per-command 승인 없이** 자동실행, `agent-team teammate ready/mail/task` **헬퍼 Windows 동작** — agy 능력 자체 PASS (hello.txt 생성 확인). 단 라이브 중 버그 2개:
+
+- **[FIXED] cp949 디코드 크래시** (`psmux_backend._run`): `subprocess.run(text=True)`가 인코딩 미지정 → 한글 Windows 로케일(cp949)로 psmux 출력(박스문자 `─`=`e2 94 80`/불릿/한글) 디코드 시도 → 리더 스레드 `UnicodeDecodeError` → orchestrator 크래시. `encoding="utf-8", errors="replace"` 추가로 수정. 단위테스트 못 잡음(mock psmux). 410 passed 유지.
+- **[OPEN] agy cold-boot kickoff drop** (`teammate_runner._wait_until_input_ready`): "출력 안정=입력준비" 휴리스틱이 agy의 즉시 그려지는 정적 splash 배너에 ~0.5초만에 settle → 인터랙티브 컴포저 준비 전 kickoff send_keys → **키 유실**. cold 폴더서 재현(run1, g1c), warm 폴더선 우연히 성공(g1b) = 레이스. agy는 kickoff 도착하면 정상동작(수동 재전송으로 확인). **G5 자율의 전제**. 처방: kickoff 전송 후 페인 변화 검증+재전송(CLI-중립). agy 실사용 시점에 수정.
+
+부수 관찰(버그 아님): 리드 claude는 bare 런치라 새 폴더 첫실행 trust 모달 + 초기 user 메시지 필요 → **헤드리스(G5) 봉쇄 요인**, 사전 trust 시드 + 리드 kickoff 자동화 필요.
 
 ## S15c~S18 구현 @ 2026-06-21 (브랜치 s15~s18, plan→N-리뷰→구현→N-리뷰→커밋 루프)
 

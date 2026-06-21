@@ -11,18 +11,32 @@ agy 1.0.10.
 - [x] `agy help mcp` → "unknown subcommand: mcp" (confirms no MCP subcommand → lead deferred).
 
 ## Token / auth checks
-- [ ] G1 (teammate): an INTERACTIVE `agy --dangerously-skip-permissions` pane accepts
-      a kickoff via psmux send_keys and runs tool calls WITHOUT per-command approval
-      or a first-run trust prompt. [token]
-      WATCH: agy has NO separate `--skip-trust` flag (gemini did) — the assumption is
-      that `--dangerously-skip-permissions` also clears the Claude-Code first-run
-      "trust this folder" prompt. If it does NOT, the pane blocks on a trust modal and
-      the kickoff lands on the modal, not the input line (silent hang — `_wait_until_
-      input_ready` settles on any stable non-empty output, incl. a modal). Confirm the
-      pane is at the prompt, not a trust dialog, when the kickoff fires. If it hangs,
-      remedy = pre-seed per-folder trust or add a trust-bypass flag to teammate_launch_args.
-- [ ] Helper-under-agy (teammate): confirm the `agent-team` shell helper (mail/task/
-      `teammate ready`) runs under agy on Windows (the teammate brief tells it to). [token]
+- [x] G1 (teammate) — PARTIAL @ 2026-06-21 (Windows). agy pane runs tool calls WITHOUT
+      per-command approval AND WITHOUT a first-run trust prompt (PASS: the assumption
+      below holds — `--dangerously-skip-permissions` DOES clear the trust modal; agy
+      went straight to its `>` prompt on a cold, never-trusted folder). BUT the
+      auto-kickoff itself is unreliable on a COLD boot (see WATCH below): the kickoff
+      send_keys DROPPED on a fresh folder (run1 + g1c), so agy sat idle at an empty
+      prompt; a manual resend then ran the task fine. On a WARM folder (g1b) the
+      auto-kickoff landed. So: agy capability PASS, auto-kickoff delivery = OPEN BUG.
+      WATCH (CONFIRMED, root cause reclassified): the silent-hang risk is REAL but the
+      failure mode is a DROPPED kickoff, not a trust-modal block. `_wait_until_input_
+      ready` settles on agy's instantly-painted static splash banner (~0.5s, stable
+      non-empty) BEFORE agy's interactive composer accepts input → keystrokes lost.
+      It's a boot-speed RACE (cold=fail, warm=pass). Remedy is NOT trust-related:
+      verify the pane changed after send_keys and resend if not (CLI-neutral), or probe
+      the real input-ready marker instead of "any stable output". Deferred — agy not in
+      immediate use. See PROGRESS.md "G1 라이브 실행 발견".
+- [x] Helper-under-agy (teammate) — PASS @ 2026-06-21 (Windows). agy ran
+      `agent-team teammate ready --session <id> --as <name>`, `agent-team mail send`,
+      and `agent-team task list` from its pane; orchestrator saw it HEALTHY + created
+      src/hello.txt="ok". [token]
+
+> Also surfaced live (NOT an agy issue): a cp949 UnicodeDecodeError crashed the
+> orchestrator when `psmux_backend._run` decoded pane captures (box-drawing / CJK)
+> with the Windows locale codec. FIXED: forced `encoding="utf-8", errors="replace"`.
+> And the LEAD claude is bare-launched → hits the first-run trust modal on a fresh
+> folder and needs an initial user turn (blocks headless G5 until pre-seeded).
 
 ## Deferred (lead — needs an MCP spike)
 - [ ] Resolve how agy hosts an MCP server (Claude-Code `.mcp.json` project convention?
@@ -30,5 +44,8 @@ agy 1.0.10.
       agy be evaluated as a lead. Out of scope for S12a.
 
 ## Outcome
-- G0 (done) + G1 + helper PASS → S12a (agy teammate) is trustworthy to use.
+- G0 + helper PASS, G1 PARTIAL @ 2026-06-21: agy teammate CAPABILITY is trustworthy
+  (no trust modal, auto-approve, helpers work), but the runner's AUTO-kickoff drops on
+  a cold agy boot — must fix the kickoff verify/retry before agy is used hands-off
+  (esp. headless G5). Manual kickoff works today.
 - Lead is blocked on the MCP spike above.
