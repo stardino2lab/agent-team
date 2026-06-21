@@ -1,8 +1,39 @@
 # Progress
 
-## Current: S11/S12 live e2e run on Windows @ 2026-06-20 — claude-lead + codex-teammate flow PASS; codex-LEAD FAIL (no MCP). Next: agy G1, codex-lead MCP spike, Linux re-verify.
+## Current: S13~S18 로드맵 전체 코드 완료 @ 2026-06-21 — 410 passed/1 skipped, ruff clean. 남은 건 라이브 게이트(아래 인덱스) + 소비자-부재 연기(S15b, S16c/d/e). main 머지 미실시(s15~s18 브랜치).
 
-## Last completed: S10 payment-api E2E @ 2026-06-15 — PASSED
+## Last completed: S18c 헤드리스 E2E 게이트 체크리스트 @ 2026-06-21
+
+## 라이브 게이트 인덱스 (제가 못 돌림 — 사용자 실행) @ 2026-06-21
+
+코드는 전부 단위테스트됨. 토큰/Linux/헤드리스가 필요한 검증만 체크리스트로 남김.
+
+| 게이트 | 파일 | 검증 대상 | 상태 |
+|---|---|---|---|
+| G5 헤드리스 E2E (캡스톤) | `tests/manual/s18c-headless.md` | 무인 자율: start→외부승인→작업→종료→`final` 매니페스트, timeout/stop/SIGTERM/crash 변형, 헤드리스 Linux | 대기 |
+| S18b 데몬 수명주기 | `tests/manual/s18b-daemon-lifecycle.md` | graceful stop/exit-code, `--timeout` kill-all, `final`/terminal status, SIGTERM graceful, crash→stop 리퍼 | 대기 |
+| S18a 외부 승인자 | `tests/manual/s18a-external-approver.md` | Hermes approve/deny, TUI 안 열림, `decided_by:hermes` | 대기 |
+| S17 worktree 격리 (G6) | `tests/manual/s17-worktree-gates.md` | 두 writer 같은 파일 격리/머지/prune, Windows 경로길이·락 | 대기 |
+| S14 status 게이트 | `tests/manual/s14-status-gates.md` | 실제 dead-pane, transcript mtime 전진 | 대기 |
+| S13c tmux Linux (G3/G4) | `tests/manual/s13-tmux-linux.md` | Linux tmux 멀티페인/kickoff/dead-detect (tmux≥3.4) | 대기 |
+| S15a/S12 agy 토큰 (G1) | `tests/manual/s12-agy-gates.md` | agy 티미 라이브: kickoff, auto-approve, helper-under-agy | G0 PASS, G1 대기 |
+
+**연기 (소비자 없어서):** S15b agy-LEAD (agy `mcp` 서브커맨드 부재 → MCP 호스팅 스파이크 필요), S16c/d/e (실제 Hermes 생겨야 매니페스트/triage 스키마 동결).
+
+## S15c~S18 구현 @ 2026-06-21 (브랜치 s15~s18, plan→N-리뷰→구현→N-리뷰→커밋 루프)
+
+per-step 전문가 리뷰가 구현 전 BLOCKING 차단. 332→410 테스트, 단계별 커밋.
+
+- **S15c [2ca2442, s15]** cost-aware 역할→CLI: `role_cli_overrides`(persona명 키, `is_teammate_supported` 검증) + `agy-tester` persona(bundled↔root 미러). 리뷰 BLOCKING: override가 기록만 바꾸고 런치 CLI는 persona 기본값 재유도 → `orchestrator._spawn_one`→`teammate_runner.spawn(cli=)`로 승인 cli 관통.
+- **S16a/b [79e01e5, s16]** Hermes 결과 매니페스트: 신규 `manifest.py` 순수 투영(`build_manifest`) + `logs manifest` CLI(json/jsonl/md) + 세션종료 `result_manifest.json` 캐시. **두 번째 진실원본 없음** — 기존 store들 read-time 투영. status 도출: completed / in_progress→abandoned(stopped시) / pending→blocked(미충족 dep, 누락 dep=blocked fail-safe). S16c/d/e 연기.
+- **S17 [dcf4fb2, s17]** worktree 격리(봉쇄): `isolate_worktrees` 플래그 + `workspace-write` persona만 자기 `git worktree`에서 실행. spawn시 생성(멱등/크래시 고아 자가치유), shutdown시 prune. 생성 실패=하드스톱(공유 체크아웃 폴백 금지). 자율운영 전제.
+- **S18a [e17bae6, s18]** 외부 승인자 CLI `approvals`(list/approve/deny) — Hermes가 TUI 없이 spawn 승인, spawn 게이트 불변(승인자만 프로그램으로). `SpawnRequestNotFoundError`→`CLI_ERRORS`.
+- **S18b1 [f38f070, s18]** graceful `stop` + 공유 `block_until_stopped`(stop 마커 폴링, 종료코드). 이벤트→마커 순서(매니페스트 race 방지), 시작시 stale 마커 클리어.
+- **S18b2 [893b1b2, s18]** `--timeout`/`--autonomous`(autonomous는 timeout 필수) + 종료시 kill-all-panes + 매니페스트 `final` 불린/terminal `session_status`. **Hermes는 `final=true`에만 반응**(중간 읽기 위험 차단). MANIFEST_VERSION 2.
+- **S18b3 [351a50d, s18]** SIGTERM graceful 종료 매니페스트(컨테이너/`kill` → abrupt death 대신 클린 매니페스트, 헤드리스 Linux 의미) + `stop` 고아 pane 리퍼(크래시한 orchestrator의 auto-approve 티미 정리). 크래시 후 재생성은 코드 불요(S16a 순수 투영).
+- **S18c [b738b33, s18]** 헤드리스 자율 E2E 게이트 체크리스트(G5) — 코드 없음.
+
+## S11/S12 live e2e (Windows, real CLIs) @ 2026-06-20
 
 ## S11/S12 live e2e (Windows, real CLIs) @ 2026-06-20
 
