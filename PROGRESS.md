@@ -2,7 +2,7 @@
 
 ## Current: S13~S18 로드맵 전체 코드 완료 @ 2026-06-21 — 410 passed/1 skipped, ruff clean. 남은 건 라이브 게이트(아래 인덱스) + 소비자-부재 연기(S15b, S16c/d/e). main 머지 미실시(s15~s18 브랜치).
 
-## Last completed: S18c 헤드리스 E2E 게이트 체크리스트 @ 2026-06-21
+## Last completed: G1+Gs 라이브 실행 + Ubuntu(claude+codex) 준비 push @ 2026-06-22
 
 ## 라이브 게이트 인덱스 (제가 못 돌림 — 사용자 실행) @ 2026-06-21
 
@@ -14,11 +14,19 @@
 | S18b 데몬 수명주기 | `tests/manual/s18b-daemon-lifecycle.md` | graceful stop/exit-code, `--timeout` kill-all, `final`/terminal status, SIGTERM graceful, crash→stop 리퍼 | 대기 |
 | S18a 외부 승인자 | `tests/manual/s18a-external-approver.md` | Hermes approve/deny, TUI 안 열림, `decided_by:hermes` | 대기 |
 | S17 worktree 격리 (G6) | `tests/manual/s17-worktree-gates.md` | 두 writer 같은 파일 격리/머지/prune, Windows 경로길이·락 | 대기 |
-| S14 status 게이트 | `tests/manual/s14-status-gates.md` | 실제 dead-pane, transcript mtime 전진 | 대기 |
-| S13c tmux Linux (G3/G4) | `tests/manual/s13-tmux-linux.md` | Linux tmux 멀티페인/kickoff/dead-detect (tmux≥3.4) | 대기 |
+| S14 status 게이트 (Gs) | `tests/manual/s14-status-gates.md` | 실제 dead-pane, transcript mtime 전진 | free+dead-detect **PASS**(Win) · **mtime-falsepos FAIL**(Win transcript 안 자람, 아래) |
+| S13c tmux Linux (G3/G4) | `tests/manual/s13-tmux-linux.md`, `tests/manual/ubuntu-attended-runbook.md` | Linux tmux 멀티페인/kickoff/dead-detect (tmux≥3.4) + claude lead+codex 티미 유인 | 대기 (런부크 준비됨, codex 서브밋키 Linux 디폴트 land) |
 | S15a/S12 agy 토큰 (G1) | `tests/manual/s12-agy-gates.md` | agy 티미 라이브: kickoff, auto-approve, helper-under-agy | G0 PASS · G1 부분: agy auto-approve+helper+no-trust PASS(Win), 자동 kickoff **cold=FAIL(drop)**/warm=OK · 버그2(아래) |
 
 **연기 (소비자 없어서):** S15b agy-LEAD (agy `mcp` 서브커맨드 부재 → MCP 호스팅 스파이크 필요), S16c/d/e (실제 Hermes 생겨야 매니페스트/triage 스키마 동결).
+
+### Gs(S14) 라이브 실행 + Ubuntu 준비 @ 2026-06-22 (Windows + WSL 정찰)
+- **Gs free 체크 PASS:** `status --json`(members/task_counts/panes_available/overall_ok), `--no-panes`(panes_available:false, running→unknown), exit 코드(healthy=0/bad-id=1/unhealthy=2).
+- **Gs dead-detect PASS:** 리드 페인 kill → `health:dead`, `overall_ok:false`, escalation `member dead`, exit 2.
+- **Gs mtime-falsepos FAIL [OPEN 버그, Win 전용]:** `pipe_pane`가 `cat >> file`을 PowerShell 페인서 실행 → `cat`=Get-Content라 stdin 안 흘림 → 전 Windows 티미 transcript.log **0 bytes 동결**. 무출력 장기작업 중 last_activity heartbeat 죽음 → 600s 후 STALE 오탐. **Ubuntu(bash)는 `cat>>` 정상이라 무관.** 처방 plan-eng-review 완료(1A), 구현 연기(Win 전용·메인은 Ubuntu).
+- **codex Linux 서브밋키 [FIXED, `7946deb`]:** `CliSpec.teammate_submit_keys_posix` 추가, codex=Tab+Enter를 非win32 디폴트로. env `AGENT_TEAM_SUBMIT_KEYS_CODEX`로 라이브 토글. claude=Enter 유지. 411 passed.
+- **Ubuntu 준비 push:** `s18` origin push(`7946deb` 코드 + `247a14b` 런부크). 내일 Ubuntu 24서 `git clone … && git checkout s18` → `tests/manual/ubuntu-attended-runbook.md` 따라 claude lead+codex 티미 유인 검증(=G3/G4). **주의: tmux≥3.4, Linux 네이티브 claude+codex 인증 필요**(WSL 22.04=tmux 3.2a + /mnt/c Windows 바이너리라 검증 부적합).
+- **새 TODO:** Hermes 헤드리스 리드(trust-bypass+자동kickoff+G5), 非PowerShell 쉘 transcript — `TODOS.md`.
 
 ### G1 라이브 실행 발견 @ 2026-06-21 (Windows, 한글 로케일)
 agy 티미는 `--dangerously-skip-permissions`로 **trust 모달 없이** 부팅, 툴콜 **per-command 승인 없이** 자동실행, `agent-team teammate ready/mail/task` **헬퍼 Windows 동작** — agy 능력 자체 PASS (hello.txt 생성 확인). 단 라이브 중 버그 2개:
