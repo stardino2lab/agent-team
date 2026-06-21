@@ -1,6 +1,6 @@
 # Progress
 
-## Current: S13~S18 로드맵 전체 코드 완료 @ 2026-06-21 — 410 passed/1 skipped, ruff clean. 남은 건 라이브 게이트(아래 인덱스) + 소비자-부재 연기(S15b, S16c/d/e). main 머지 미실시(s15~s18 브랜치).
+## Current: S13~S18 로드맵 전체 코드 완료 @ 2026-06-21 — 411 passed/1 skipped, ruff clean. 남은 건 라이브 게이트(아래 인덱스) + 소비자-부재 연기(S15b, S16c/d/e). main 머지 미실시(s15~s18 브랜치).
 
 ## Last completed: G1+Gs 라이브 실행 + Ubuntu(claude+codex) 준비 push @ 2026-06-22
 

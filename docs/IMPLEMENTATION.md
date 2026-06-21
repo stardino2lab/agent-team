@@ -1,4 +1,4 @@
-# IMPLEMENTATION — S0 through S10
+# IMPLEMENTATION — S0 through S18
 
 Milestone spec for the agent-team orchestrator.  
 **Workflow:** implement → `pytest` / checklist → report → user approve → commit → (optional) push.
@@ -199,6 +199,37 @@ agent-team --help   # optional stub
 
 ---
 
+## S11–S18 — multi-CLI, backends, daemon (code-complete @ 2026-06-21)
+
+Delta summary. Per-slice/per-commit narrative is the canonical English log in
+[PROGRESS.md](../PROGRESS.md); shared reference parts (§MCP Tools, §Orchestrator
+flags, §Schemas, §Dependencies below) are updated to the S18 end-state. Live
+token/Linux/headless gates remain (see `tests/manual/LIVE-GATES.md`); not yet
+merged to main (branches `s15`–`s18`).
+
+| Slice | What landed | Live gate |
+|-------|-------------|-----------|
+| **S11a** | $20-lead hardening: orchestrate-only preamble + event-driven `wait_for_event`/`get_recent_events` (no polling) + bounded/filtered reads. **MCP tools 9 → 11.** | — |
+| **S11b** | teammate transcript capture (`pipe_pane` → `transcript.log`) + `_wait_until_input_ready` + codex non-interactive launch args | Win PASS |
+| **S11c** | codex 2nd lead: `CliSpec.mcp_format` (json/toml), CODEX_HOME profile, `codex exec` launch arm | **FAIL** — codex doesn't load the MCP |
+| **S12a** | agy (Antigravity) teammate (replaces gemini), opt-in personas, `supports_lead=False` | G0 PASS, G1 partial |
+| **S13a/b** | `TerminalBackend` abstraction + factory; `TmuxBackend` (Linux/macOS) | tmux Linux pending |
+| **S14a–d** | `health.py` + `agent-team status`, escalation derivation, bounded spawn retry, torn-line-tolerant `event_log.read` | status pending |
+| **S15c** | `role_cli_overrides` (per-role CLI cost dial), `agy-tester` persona | — |
+| **S16a/b** | `manifest.py` read-only projection + `logs manifest` CLI + session-end `result_manifest.json` cache | — |
+| **S17** | git-worktree isolation (`isolate_worktrees`): per-writer worktree, idempotent create + shutdown prune, hard-stop on create failure | G6 pending |
+| **S18a** | external-approver CLI `approvals` (list/approve/deny) — headless spawn approval | pending |
+| **S18b1–3** | graceful `stop` + `block_until_stopped`; `--timeout`/`--autonomous` + kill-all-panes + `final`/terminal `session_status` (MANIFEST_VERSION 2); SIGTERM graceful manifest + orphan-pane reaper | pending |
+| **S18c** | headless autonomous E2E gate checklist (G5, capstone) — no code | pending |
+
+**Deferred (no consumer yet):** S15b agy-LEAD (agy has no `mcp` subcommand → MCP-hosting spike), S16c/d/e (manifest/triage schema freeze waits for a real Hermes).
+
+**Verify:** **411 passed / 1 skipped**, ruff clean (2026-06-22).
+
+**Diagrams:** terminal-backend factory + daemon-lifecycle state machine are in [architecture.md](architecture.md).
+
+---
+
 ## Test matrix summary
 
 Minimums planned per milestone (actual cumulative tracked in [PROGRESS.md](../PROGRESS.md)):
@@ -216,6 +247,8 @@ Minimums planned per milestone (actual cumulative tracked in [PROGRESS.md](../PR
 | S8 | 8 | 60 |
 
 **Actual cumulative (2026-06-15): 216 passed** (S7 hardening, S8 14, S9 registry seam, S10a–c, plus S0–S6 review regressions all landed above the per-milestone minimums).
+
+**Actual cumulative (2026-06-22): 411 passed / 1 skipped** — S11→S18 added ~195 tests (backends, worktree, manifest, health/status, stop/lifecycle, retry, external approver, agy).
 
 ---
 
@@ -350,6 +383,31 @@ Resolution: append to `approval/resolutions.jsonl`:
 }
 ```
 
+`decided_by` is `user` (TUI) or `hermes` (external-approver CLI, S18a). New event
+types since S0–S10: `escalation_*` (S14) and the lifecycle path drives the manifest below.
+
+#### result_manifest.json (S16/S18, MANIFEST_VERSION 2)
+
+Read-only projection over the existing stores, cached at session end. Hermes (the
+external consumer) reads it **only when `final` is true** — a non-final manifest is a
+mid-run snapshot and must be ignored.
+
+```json
+{
+  "manifest_version": 2,
+  "session_id": "…",
+  "final": true,
+  "session_status": "stopped",
+  "tasks": [{ "task_id": "task-001", "status": "completed" }],
+  "teammates": [{ "name": "planner-1", "status": "completed" }]
+}
+```
+
+`session_status` terminal values: `stopped` (graceful `stop`), `timed_out`
+(`--timeout`), `graceful` (SIGTERM handler). Task status is derived: `completed` /
+`in_progress`→`abandoned` (on stop) / `pending`→`blocked` (unmet dep; a missing dep
+is a fail-safe `blocked`).
+
 #### consumer `.agent-team/config.yaml`
 
 See `templates/project/config.yaml.j2` and [project-integration.md](project-integration.md).
@@ -376,6 +434,10 @@ Config example: `templates/claude-mcp.json.example`
 | `claim_task` | `{task_id, assignee?}` | Fails if deps incomplete |
 | `complete_task` | `{task_id}` | Sets state completed |
 | `list_teammates` | `{}` | `{members: [...]}` from session.json |
+| `get_recent_events` | `{since?, limit?}` | **(S11a)** non-blocking tail of `events.jsonl` |
+| `wait_for_event` | `{types, since?, timeout?}` | **(S11a)** blocks (watchfiles, bounded by monotonic deadline) until a matching event — lead waits with zero token burn instead of shell-loop polling |
+
+**Tool count: 11** (was 9 at S6; S11a added the two event-driven tools above).
 
 **spawn_teammate flow:**
 
@@ -396,6 +458,7 @@ Config example: `templates/claude-mcp.json.example`
 | S6 | `mcp>=1.0,<2` | — |
 | S7 | `textual`, `watchfiles` | — |
 | S8 | — | — |
+| S11–S18 | — (no new runtime deps; S11a reuses `watchfiles` for event-driven waits, S17 worktree shells out to `git`) | — |
 
 ---
 
@@ -446,6 +509,10 @@ On approve: write resolution, clear pending, orchestrator continues spawn.
 | `--dry-run` | Mock teammates, no real Claude/Codex |
 | `--no-psmux` | TUI + file session only; no pane split |
 | `--project PATH` | Consumer project root (default cwd) |
+| `--timeout SECONDS` | **(S18b)** auto-terminate (kill all panes) after N seconds; required with `--autonomous` |
+| `--autonomous` | **(S18b)** headless run, no interactive lead/TUI; pairs with the external approver. Must set `--timeout` |
+
+**Related commands (not `start` flags):** `agent-team stop` (graceful S18b — writes `stop.marker`, reaps orphan panes), `agent-team status` (health snapshot, S14), `agent-team approvals list/approve/deny` (external approver, S18a), `agent-team logs manifest --format json|jsonl|md` (result projection, S16).
 
 ---
 

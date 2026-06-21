@@ -43,3 +43,25 @@ Deferred work items. Each captures enough context to pick up cold.
   Attended mode keeps the manual trust + manual first turn unchanged.
 - **Depends on / blocked by:** decision to pursue unattended/Hermes (deferred
   2026-06-22 in favor of attended-first); codex submit-keys Linux default landing.
+
+## Doc-drift guard (automated currency check)
+
+- **What:** A lightweight test that fails when docs drift from code — assert the
+  README / `docs/STATUS.ko.md` status-line milestone matches the latest "done"
+  row in the milestone-gate table, and that the stated test count matches
+  `pytest --co -q`. Higher-value half: enforce the PROGRESS.md ↔ PROGRESS.ko.md
+  EN↔KO mirror stays in lockstep.
+- **Why:** The 2026-06-22 doc sync found the *canonical* PROGRESS.md claiming
+  "410 passed" when reality was 411, and 5 of 8 docs frozen 6+ slices behind the
+  code. Manual milestone/test-count tracking rots silently; full-mirror Korean
+  now means two deep logs to keep in step.
+- **Pros:** Drift becomes a red CI signal instead of a quarterly surprise; cheap
+  to run; makes the EN↔KO mirror enforceable, not trust-based.
+- **Cons:** A test that must change every milestone can become noise; test-count
+  assertions can flap on WIP branches — gate it to a sanity range or run advisory.
+- **Context:** Add `tests/test_docs_currency.py` parsing the milestone-gate
+  tables in `PROGRESS.md` / `PROGRESS.ko.md` / `docs/STATUS.ko.md` plus the README
+  status line. Start with the EN↔KO mirror consistency (highest value), then the
+  test-count stamp. See the 2026-06-22 doc-sync (S11→S18 sweep) for the motivating
+  drift.
+- **Depends on / blocked by:** nothing.

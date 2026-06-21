@@ -50,10 +50,12 @@ Derived from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpa
 
 ## References
 
+- [PROGRESS.md](PROGRESS.md) — canonical milestone tracker (S0–S18); [PROGRESS.ko.md](PROGRESS.ko.md) / [docs/STATUS.ko.md](docs/STATUS.ko.md) are the Korean mirror
 - [docs/PRD.md](docs/PRD.md)
 - [docs/RGIO.md](docs/RGIO.md)
-- [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+- [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — S0–S18 specs + schemas + MCP
 - [docs/architecture.md](docs/architecture.md)
+- [docs/s13-next-phase-roadmap.md](docs/s13-next-phase-roadmap.md) — S13→S18 roadmap
 - [docs/project-integration.md](docs/project-integration.md)
-- [docs/setup-windows.md](docs/setup-windows.md)
+- [docs/setup-windows.md](docs/setup-windows.md) (Windows) · [tests/manual/ubuntu-attended-runbook.md](tests/manual/ubuntu-attended-runbook.md) (Linux/tmux)
 - [docs/playbooks/](docs/playbooks/)
