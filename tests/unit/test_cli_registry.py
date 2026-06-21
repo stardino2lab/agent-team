@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from agent_team.cli_registry import (
@@ -166,22 +168,45 @@ def test_claude_teammate_launch_args_empty() -> None:
 
 
 def test_default_teammate_submit_keys_are_enter() -> None:
-    # All three CLIs submit on Enter alone — the default. Verified live on Windows
-    # for codex 0.139.0 (tmux 3.3.5): Enter alone submits; Tab+Enter is NOT needed
-    # (tests/manual/s11b-teammate-hardening.md §D11b Step A). Linux codex needed
-    # Tab+Enter — that is driven by AGENT_TEAM_SUBMIT_KEYS_CODEX, not the default.
+    # Base (Windows psmux) submit keys: Enter alone. Verified live on Windows for
+    # codex 0.139.0 (tmux 3.3.5): Enter alone submits (tests/manual/
+    # s11b-teammate-hardening.md §D11b Step A).
     assert get_cli_spec("claude").teammate_submit_keys == ("Enter",)
     assert get_cli_spec("codex").teammate_submit_keys == ("Enter",)
     assert get_cli_spec("agy").teammate_submit_keys == ("Enter",)
+    # POSIX (tmux/Linux) override: only codex declares Tab+Enter; the others fall
+    # through to the base Enter on every platform.
+    assert get_cli_spec("codex").teammate_submit_keys_posix == ("Tab", "Enter")
+    assert get_cli_spec("claude").teammate_submit_keys_posix is None
+    assert get_cli_spec("agy").teammate_submit_keys_posix is None
 
 
-def test_resolve_submit_keys_uses_registry_default_without_env(
+def test_resolve_submit_keys_default_is_platform_aware(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Without an env override, codex's default depends on the host: Windows psmux
+    # submits on Enter; an off-Windows tmux pane needs Tab+Enter (the posix
+    # override). claude has no posix override → Enter on both.
     monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", raising=False)
     monkeypatch.delenv("AGENT_TEAM_SUBMIT_KEYS_CLAUDE", raising=False)
+
+    monkeypatch.setattr(sys, "platform", "win32")
     assert resolve_teammate_submit_keys("codex") == ("Enter",)
     assert resolve_teammate_submit_keys("claude") == ("Enter",)
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert resolve_teammate_submit_keys("codex") == ("Tab", "Enter")
+    assert resolve_teammate_submit_keys("claude") == ("Enter",)
+
+
+def test_resolve_submit_keys_env_override_wins_off_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The env var beats the posix default, so a Linux user can toggle codex back
+    # to Enter (or anything) live without a code change.
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("AGENT_TEAM_SUBMIT_KEYS_CODEX", "Enter")
+    assert resolve_teammate_submit_keys("codex") == ("Enter",)
 
 
 def test_resolve_submit_keys_env_override_wins(

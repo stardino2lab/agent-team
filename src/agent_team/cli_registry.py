@@ -11,6 +11,7 @@ so it cannot yet host the agent-team MCP server).
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 
 
@@ -41,6 +42,14 @@ class CliSpec:
     # per platform/version: a LINUX codex e2e needed ("Tab","Enter"), set via that
     # env var until the S13 backend factory adds sys.platform defaulting.
     teammate_submit_keys: tuple[str, ...] = ("Enter",)
+    # POSIX (tmux, i.e. non-win32) submit-key override. When set and the host is
+    # not Windows, this replaces teammate_submit_keys at resolve time. codex on a
+    # Linux tmux pane needs ("Tab","Enter") — Enter alone leaves its composer
+    # unsubmitted (verified in a Linux codex e2e); on Windows psmux it submits on
+    # Enter. None = use teammate_submit_keys on every platform (e.g. claude). The
+    # env var AGENT_TEAM_SUBMIT_KEYS_<CLI> still overrides BOTH, so a user can flip
+    # a Linux codex back to Enter (or anything) live without a code change.
+    teammate_submit_keys_posix: tuple[str, ...] | None = None
     # How the lead MCP config is delivered (a DELIVERY-STRATEGY tag, not a file
     # extension): "json" = a file passed via --mcp-config (claude); "toml" =
     # TOML-encoded inline `-c` overrides on the codex exec launch line, NO file
@@ -97,8 +106,12 @@ _REGISTRY: dict[str, CliSpec] = {
             "-c",
             "check_for_update_on_startup=false",
         ),
-        # submit keys: default ("Enter",) — Windows codex submits on Enter alone
-        # (verified). Linux needs Tab+Enter via AGENT_TEAM_SUBMIT_KEYS_CODEX.
+        # submit keys: Windows psmux codex submits on Enter alone (verified, the
+        # base default). Linux tmux codex needs Tab+Enter, now applied by DEFAULT
+        # off-Windows via teammate_submit_keys_posix (was previously only reachable
+        # by setting AGENT_TEAM_SUBMIT_KEYS_CODEX by hand). The env var still
+        # overrides both, so a Linux user can toggle back to "Enter" live.
+        teammate_submit_keys_posix=("Tab", "Enter"),
         mcp_format="toml",
     ),
     "agy": CliSpec(
@@ -138,14 +151,22 @@ def is_lead_supported(name: str) -> bool:
 def resolve_teammate_submit_keys(name: str) -> tuple[str, ...]:
     """The keys the runner presses to submit a teammate's kickoff, env-overridable.
 
-    Defaults to the registry's ``teammate_submit_keys`` for the CLI. The env var
-    ``AGENT_TEAM_SUBMIT_KEYS_<CLI_UPPER>`` (whitespace-separated tmux key names,
-    e.g. "Tab Enter") overrides it, so the submit sequence can be tuned per
-    platform / codex version without a code change — and Linux can run today
-    before the S13 backend factory adds ``sys.platform`` defaulting. A set-but-
-    empty value means "type without submitting" (no submit keypress).
+    Resolution order: (1) the env var ``AGENT_TEAM_SUBMIT_KEYS_<CLI_UPPER>``
+    (whitespace-separated tmux key names, e.g. "Tab Enter") always wins — a
+    set-but-empty value means "type without submitting"; (2) off-Windows, the
+    CLI's ``teammate_submit_keys_posix`` if declared (codex → Tab+Enter, since a
+    Linux tmux codex composer ignores a lone Enter); (3) the base
+    ``teammate_submit_keys`` (Enter). So a Linux codex works out of the box and
+    the env var lets a user toggle it (e.g. back to "Enter") live per platform /
+    codex version without a code change.
     """
     override = os.environ.get(f"AGENT_TEAM_SUBMIT_KEYS_{name.upper()}")
     if override is not None:
         return tuple(override.split())
-    return get_cli_spec(name).teammate_submit_keys
+    spec = get_cli_spec(name)
+    # Off-Windows (tmux), prefer the POSIX submit keys when the CLI declares them
+    # (codex → Tab+Enter). The env var above still wins, so this default is just a
+    # works-out-of-the-box baseline that stays live-toggleable.
+    if sys.platform != "win32" and spec.teammate_submit_keys_posix is not None:
+        return spec.teammate_submit_keys_posix
+    return spec.teammate_submit_keys
