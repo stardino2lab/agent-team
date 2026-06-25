@@ -44,6 +44,32 @@ Deferred work items. Each captures enough context to pick up cold.
 - **Depends on / blocked by:** decision to pursue unattended/Hermes (deferred
   2026-06-22 in favor of attended-first); codex submit-keys Linux default landing.
 
+## Enterprise per-command approval routed to Hermes (1B)
+
+- **What:** Let codex/agy teammates run in the enterprise (no-auto-approve) mode by
+  routing each tool-call approval to Hermes, instead of the `--dangerously-*`
+  auto-approve flags that enterprise bans.
+- **Why:** The 1A decision (plan-eng-review 2026-06-25) makes enterprise mode
+  claude-teammate-only — codex/agy are personal-mode-only because their teammate
+  launch depends on `--dangerously-bypass-approvals-and-sandbox` /
+  `--dangerously-skip-permissions`, which enterprise forbids. 1B is the only path
+  that brings codex/agy into an enterprise team.
+- **Pros:** Unlocks heterogeneous teams under enterprise policy; Hermes already
+  owns spawn approval (S18a), so per-command approval is a conceptual extension.
+- **Cons:** Highest operational risk of the options considered: every tool call
+  round-trips to Hermes (latency + single point of failure if Hermes stalls), and
+  each CLI has a different approval protocol (codex sandbox prompts vs agy vs
+  claude) → brittle, many edge cases. Weaker compliance story than 1A ("flag
+  present but intercepted" is harder to audit than "flag absent").
+- **Context:** Start from the S18a external-approver seam (`cli/approvals` +
+  `spawn_approval`) and widen it from spawn-time to per-tool-call. The hard part is
+  intercepting tool calls at the CLI boundary — codex/agy don't expose a clean
+  per-call approval hook the way the spawn gate does. Likely needs an MCP-level or
+  pane-driver interception layer. Prove live before trusting it for compliance.
+- **Depends on / blocked by:** 1A landing first (mode gate + `resolve_launch_args`);
+  a real enterprise requirement to run codex/agy (deferred 2026-06-25 — enterprise
+  is claude-team-only until this is genuinely needed).
+
 ## Doc-drift guard (automated currency check)
 
 - **What:** A lightweight test that fails when docs drift from code — assert the
